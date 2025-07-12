@@ -57,28 +57,67 @@ export default function ConversationsPage() {
         if (response.ok) {
           const data = await response.json()
           
-          // Transform backend data to frontend format
-          const transformedConversations = data.map((conv: any) => ({
-            id: conv.id,
-            visitor: conv.visitor_name || 'Anonymous User',
-            email: conv.visitor_email || null,
-            website: conv.website_domain || 'Unknown',
-            status: conv.status || 'active',
-            priority: conv.priority || 'normal',
-            lastMessage: conv.last_message || 'No messages yet',
-            timestamp: new Date(conv.last_message_time || conv.created_at).toLocaleString(),
-            agent: conv.agent?.name || null,
-            messages: conv.message_count || 0,
-            waitTime: '0m', // Calculate from timestamps if needed
-            tags: conv.tags || [],
-            unreadCount: conv.unread_count || 0
-          }))
+          // Transform backend data to frontend format with safe property access
+          const transformedConversations = (Array.isArray(data) ? data : []).map((conv: any) => {
+            try {
+              return {
+                id: conv?.id || '',
+                visitor: conv?.visitor_name || 'Anonymous User',
+                email: conv?.visitor_email || null,
+                website: conv?.website_domain || conv?.website_name || 'Unknown',
+                status: conv?.status || 'active',
+                priority: conv?.priority || 'normal',
+                lastMessage: conv?.last_message || 'No messages yet',
+                timestamp: (() => {
+                  try {
+                    const timeValue = conv?.last_message_time || conv?.created_at
+                    if (timeValue) {
+                      const date = new Date(timeValue)
+                      return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleString()
+                    }
+                    return 'Unknown time'
+                  } catch (timeError) {
+                    console.warn('Error formatting timestamp:', timeValue, timeError)
+                    return 'Invalid time'
+                  }
+                })(),
+                agent: conv?.agent?.name || null,
+                messages: conv?.message_count || 0,
+                waitTime: '0m', // Calculate from timestamps if needed
+                tags: Array.isArray(conv?.tags) ? conv.tags : [],
+                unreadCount: conv?.unread_count || 0
+              }
+            } catch (convError) {
+              console.warn('Error transforming conversation:', conv?.id, convError)
+              return {
+                id: conv?.id || 'unknown',
+                visitor: 'Error loading visitor',
+                email: null,
+                website: 'Unknown',
+                status: 'active',
+                priority: 'normal',
+                lastMessage: 'Error loading messages',
+                timestamp: 'Unknown time',
+                agent: null,
+                messages: 0,
+                waitTime: '0m',
+                tags: [],
+                unreadCount: 0
+              }
+            }
+          })
           
           if (isMounted) {
             setConversations(transformedConversations)
           }
         } else {
           console.error('Failed to fetch conversations:', response.status)
+          try {
+            const errorText = await response.text()
+            console.error('Error response:', errorText)
+          } catch (e) {
+            console.error('Could not read error response')
+          }
           if (isMounted) {
             setConversations([])
           }
