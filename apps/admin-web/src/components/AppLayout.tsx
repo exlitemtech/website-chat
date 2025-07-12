@@ -84,12 +84,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
     setIsLoading(false)
   }, [mounted, router])
 
-  // Initialize WebSocket connection for global notifications
+  // Initialize WebSocket connection for global notifications (client-side only)
   const { isConnected } = useConversationWebSocket({
-    userId: user?.id || '',
-    token: (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '') || '',
+    userId: mounted && user?.id ? user.id : '',
+    token: mounted && typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '',
     enableNotifications: true,
-    currentConversationId: pathname.includes('/conversations/') ? pathname.split('/').pop() : undefined
+    currentConversationId: mounted && pathname.includes('/conversations/') ? pathname.split('/').pop() : undefined
   })
 
   const handleLogout = () => {

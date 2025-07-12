@@ -19,11 +19,30 @@ export interface UseNotificationsReturn {
 }
 
 export const useNotifications = (): UseNotificationsReturn => {
-  const [preferences, setPreferences] = useState<NotificationPreferences>(
-    notificationManager.getPreferences()
-  );
+  const [preferences, setPreferences] = useState<NotificationPreferences>(() => {
+    // Initialize with safe defaults during SSR
+    if (typeof window === 'undefined') {
+      return {
+        enabled: false,
+        newMessages: true,
+        newConversations: true,
+        urgentMessages: true,
+        visitorActivity: false,
+        soundEnabled: true,
+        doNotDisturb: false,
+      };
+    }
+    return notificationManager.getPreferences();
+  });
   
   const permission = useNotificationPermission();
+  
+  // Hydrate preferences on client mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPreferences(notificationManager.getPreferences());
+    }
+  }, []);
 
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {

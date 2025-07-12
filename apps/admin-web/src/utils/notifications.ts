@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+
 export type NotificationType = 'new_message' | 'new_conversation' | 'urgent_message' | 'visitor_joined';
 
 export interface NotificationOptions {
@@ -39,9 +41,26 @@ export class NotificationManager {
   }
 
   private loadPreferences(): NotificationPreferences {
-    const stored = localStorage.getItem('notification-preferences');
-    if (stored) {
-      return JSON.parse(stored);
+    // Return default preferences during SSR
+    if (typeof window === 'undefined') {
+      return {
+        enabled: false,
+        newMessages: true,
+        newConversations: true,
+        urgentMessages: true,
+        visitorActivity: false,
+        soundEnabled: true,
+        doNotDisturb: false,
+      };
+    }
+
+    try {
+      const stored = localStorage.getItem('notification-preferences');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load preferences from localStorage:', error);
     }
     
     return {
@@ -56,13 +75,25 @@ export class NotificationManager {
   }
 
   private savePreferences(): void {
-    localStorage.setItem('notification-preferences', JSON.stringify(this.preferences));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('notification-preferences', JSON.stringify(this.preferences));
+      } catch (error) {
+        console.warn('Failed to save preferences to localStorage:', error);
+      }
+    }
   }
 
   private initializeAudio(): void {
-    if (typeof window !== 'undefined') {
-      this.audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmkcBDuG0fPSgCwGHm+57Ny3VA');
-      this.audio.volume = 0.3;
+    // Defer audio initialization to avoid SSR issues
+    if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
+      try {
+        this.audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmkcBDuG0fPSgCwGHm+57Ny3VA');
+        this.audio.volume = 0.3;
+      } catch (error) {
+        console.warn('Failed to initialize audio:', error);
+        this.audio = null;
+      }
     }
   }
 
@@ -84,7 +115,7 @@ export class NotificationManager {
   }
 
   getPermissionStatus(): NotificationPermission | 'unsupported' {
-    if (!('Notification' in window)) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
       return 'unsupported';
     }
     return Notification.permission;
@@ -293,14 +324,25 @@ export class NotificationManager {
 export const notificationManager = NotificationManager.getInstance();
 
 export const useNotificationPermission = () => {
-  const status = notificationManager.getPermissionStatus();
+  const [status, setStatus] = useState<NotificationPermission | 'unsupported'>('unsupported');
+  
+  useEffect(() => {
+    // Only check permission status on client-side
+    if (typeof window !== 'undefined') {
+      setStatus(notificationManager.getPermissionStatus());
+    }
+  }, []);
   
   const requestPermission = async () => {
     try {
-      return await notificationManager.requestPermission();
+      const result = await notificationManager.requestPermission();
+      setStatus(result);
+      return result;
     } catch (error) {
       console.error('Failed to request notification permission:', error);
-      return 'denied' as NotificationPermission;
+      const denied = 'denied' as NotificationPermission;
+      setStatus(denied);
+      return denied;
     }
   };
 

@@ -54,19 +54,21 @@ export default function ConversationDetailPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // Get real user data from localStorage
-  const currentUser = (() => {
-    if (typeof window === 'undefined') return { id: '', token: '' }
-    
-    const token = localStorage.getItem('accessToken') || ''
-    const userData = localStorage.getItem('user')
-    const user = userData ? JSON.parse(userData) : { id: '' }
-    
-    return {
-      id: user.id || '',
-      token: token
+  // Get real user data from localStorage (client-side only)
+  const [currentUser, setCurrentUser] = useState({ id: '', token: '' })
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken') || ''
+      const userData = localStorage.getItem('user')
+      const user = userData ? JSON.parse(userData) : { id: '' }
+      
+      setCurrentUser({
+        id: user.id || '',
+        token: token
+      })
     }
-  })()
+  }, [])
 
   // WebSocket connection for real-time updates
   const {
