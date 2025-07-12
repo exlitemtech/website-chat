@@ -66,16 +66,7 @@ export default function ConversationDetailPage() {
     }
   })()
 
-  // Disable WebSocket for now to improve performance
-  const isConnected = false
-  const connectionError = null
-  const typingUsers = []
-  const sendWebSocketMessage = () => {}
-  const startTyping = () => {}
-  const stopTyping = () => {}
-
-  // WebSocket connection for real-time updates - DISABLED
-  /*
+  // WebSocket connection for real-time updates
   const {
     isConnected,
     connectionError,
@@ -87,6 +78,8 @@ export default function ConversationDetailPage() {
     userId: currentUser.id,
     token: currentUser.token,
     conversationId,
+    enableNotifications: false, // Disable notifications in conversation view since user is actively viewing
+    currentConversationId: conversationId, // Mark this as the currently viewed conversation
     onNewMessage: (message) => {
       if (conversation) {
         const newMsg: Message = {
@@ -109,7 +102,6 @@ export default function ConversationDetailPage() {
       console.log('User stopped typing:', typing)
     }
   })
-  */
 
   // Mock data loading - DISABLED
   useEffect(() => {
@@ -276,30 +268,36 @@ export default function ConversationDetailPage() {
         })
       }
       
-      // Try to send to backend API in background
-      try {
-        const token = currentUser.token
-        if (token) {
-          const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              content: newMessage,
-              sender: 'agent'
+      // Send via WebSocket if connected, otherwise fallback to API
+      if (isConnected) {
+        sendWebSocketMessage(newMessage)
+        console.log('Message sent via WebSocket')
+      } else {
+        // Fallback to REST API
+        try {
+          const token = currentUser.token
+          if (token) {
+            const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                content: newMessage,
+                sender: 'agent'
+              })
             })
-          })
-          
-          if (response.ok) {
-            console.log('Message sent to backend successfully')
-          } else {
-            console.error('Failed to send to backend:', response.status, await response.text())
+            
+            if (response.ok) {
+              console.log('Message sent to backend successfully')
+            } else {
+              console.error('Failed to send to backend:', response.status, await response.text())
+            }
           }
+        } catch (apiError) {
+          console.error('API call failed:', apiError)
         }
-      } catch (apiError) {
-        console.error('API call failed:', apiError)
       }
       
       setNewMessage('')

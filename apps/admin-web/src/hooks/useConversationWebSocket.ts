@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
+import { useNotifications } from './useNotifications'
 
 interface Message {
   id: string
@@ -28,6 +29,8 @@ interface UseConversationWebSocketOptions {
   onAgentJoined?: (data: any) => void
   onAgentLeft?: (data: any) => void
   onVisitorJoined?: (data: any) => void
+  enableNotifications?: boolean
+  currentConversationId?: string
 }
 
 export function useConversationWebSocket(options: UseConversationWebSocketOptions) {
@@ -40,8 +43,12 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     onTypingStop,
     onAgentJoined,
     onAgentLeft,
-    onVisitorJoined
+    onVisitorJoined,
+    enableNotifications = true,
+    currentConversationId
   } = options
+
+  const notifications = useNotifications()
 
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -62,6 +69,35 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
       case 'new_message':
         if (message.message) {
           onNewMessage?.(message.message)
+          
+          // Show notification for new messages from visitors
+          if (enableNotifications && 
+              message.message.sender === 'visitor' && 
+              message.message.sender_id !== userId &&
+              (!currentConversationId || currentConversationId !== message.message.conversation_id)) {
+            
+            const visitorName = message.visitor_name || `Visitor ${message.message.sender_id.slice(-4)}`
+            const messageContent = message.message.content || 'New message received'
+            
+            // Check if this is marked as urgent
+            const isUrgent = message.message.metadata?.urgent || 
+                           messageContent.toLowerCase().includes('urgent') ||
+                           messageContent.toLowerCase().includes('help')
+            
+            if (isUrgent) {
+              notifications.showUrgentMessage(
+                message.message.conversation_id,
+                visitorName,
+                messageContent
+              )
+            } else {
+              notifications.showNewMessage(
+                message.message.conversation_id,
+                visitorName,
+                messageContent
+              )
+            }
+          }
         }
         break
         
@@ -95,6 +131,23 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
         
       case 'visitor_joined':
         onVisitorJoined?.(message)
+        
+        // Show notification for new conversations
+        if (enableNotifications && message.conversation_id && message.is_new_conversation) {
+          const visitorName = message.visitor_name || `Visitor ${message.visitor_id?.slice(-4) || 'Unknown'}`
+          const websiteName = message.website_name || 'Website'
+          
+          notifications.showNewConversation(
+            message.conversation_id,
+            visitorName,
+            websiteName
+          )
+        }
+        
+        // Show visitor activity notification if enabled
+        if (enableNotifications && message.visitor_count && message.website_name) {
+          notifications.showVisitorActivity(message.website_name, message.visitor_count)
+        }
         break
         
       case 'error':
@@ -105,7 +158,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
       default:
         console.log('Unknown message type:', message.type, message)
     }
-  }, [userId, onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined])
+  }, [userId, onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined, enableNotifications, currentConversationId, notifications])
 
   const handleConnect = useCallback(() => {
     console.log('WebSocket connected')
