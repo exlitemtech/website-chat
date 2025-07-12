@@ -49,6 +49,7 @@ export default function ConversationDetailPage() {
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [messagesSentViaSocket, setMessagesSentViaSocket] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
 
@@ -89,10 +90,28 @@ export default function ConversationDetailPage() {
           timestamp: message.timestamp,
           type: 'text'
         }
-        setConversation(prev => prev ? {
-          ...prev,
-          messages: [...prev.messages, newMsg]
-        } : null)
+        
+        // Avoid duplicate messages - check if message already exists
+        setConversation(prev => {
+          if (!prev) return null
+          
+          const messageExists = prev.messages.some(msg => 
+            msg.id === newMsg.id || 
+            (msg.content === newMsg.content && 
+             msg.sender === newMsg.sender && 
+             Math.abs(new Date(msg.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000)
+          )
+          
+          if (messageExists) {
+            console.log('Message already exists, skipping duplicate')
+            return prev
+          }
+          
+          return {
+            ...prev,
+            messages: [...prev.messages, newMsg]
+          }
+        })
       }
     },
     onTypingStart: (typing) => {
@@ -250,60 +269,108 @@ export default function ConversationDetailPage() {
     if (!newMessage.trim() || sending) return
 
     setSending(true)
+    const messageContent = newMessage
+    const tempId = 'temp-' + Date.now()
     
     try {
-      // Add message to local UI first for immediate feedback
-      const localMessage: Message = {
-        id: 'msg-' + Date.now(),
-        content: newMessage,
+      // Create temporary message for immediate UI feedback
+      const tempMessage: Message = {
+        id: tempId,
+        content: messageContent,
         sender: 'agent',
         timestamp: new Date().toISOString(),
         type: 'text'
       }
       
+      // Add temp message to UI
       if (conversation) {
-        setConversation({
-          ...conversation,
-          messages: [...conversation.messages, localMessage]
-        })
+        setConversation(prev => prev ? {
+          ...prev,
+          messages: [...prev.messages, tempMessage]
+        } : null)
       }
       
-      // Send via WebSocket if connected, otherwise fallback to API
-      if (isConnected) {
-        sendWebSocketMessage(newMessage)
-        console.log('Message sent via WebSocket')
-      } else {
-        // Fallback to REST API
-        try {
-          const token = currentUser.token
-          if (token) {
-            const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                content: newMessage,
-                sender: 'agent'
-              })
-            })
-            
-            if (response.ok) {
-              console.log('Message sent to backend successfully')
-            } else {
-              console.error('Failed to send to backend:', response.status, await response.text())
-            }
-          }
-        } catch (apiError) {
-          console.error('API call failed:', apiError)
-        }
-      }
-      
+      // Clear input immediately for better UX
       setNewMessage('')
       stopTyping()
+      
+      try {
+        if (isConnected) {
+          // Send via WebSocket
+          const sent = sendWebSocketMessage(messageContent)
+          
+          if (sent) {
+            console.log('Message sent via WebSocket')
+            
+            // Track that this message was sent via socket
+            setMessagesSentViaSocket(prev => new Set(prev).add(tempId))
+            
+            // Remove temp message - the real one will come via WebSocket
+            setTimeout(() => {
+              setConversation(prev => prev ? {
+                ...prev,
+                messages: prev.messages.filter(msg => msg.id !== tempId)
+              } : null)
+            }, 100)
+          } else {
+            throw new Error('WebSocket send failed')
+          }
+          
+        } else {
+          // Send via REST API
+          const token = currentUser.token
+          if (!token) throw new Error('No authentication token')
+          
+          const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              content: messageContent,
+              sender: 'agent'
+            })
+          })
+          
+          if (response.ok) {
+            const savedMessage = await response.json()
+            console.log('Message sent via REST API successfully')
+            
+            // Replace temp message with real message from API
+            setConversation(prev => prev ? {
+              ...prev,
+              messages: prev.messages.map(msg => 
+                msg.id === tempId ? {
+                  ...msg,
+                  id: savedMessage.id || savedMessage.message?.id || tempId,
+                  timestamp: savedMessage.timestamp || savedMessage.message?.timestamp || msg.timestamp
+                } : msg
+              )
+            } : null)
+          } else {
+            throw new Error(`API request failed: ${response.status}`)
+          }
+        }
+      } catch (sendError) {
+        console.error('Failed to send message:', sendError)
+        
+        // Remove temp message and show error
+        setConversation(prev => prev ? {
+          ...prev,
+          messages: prev.messages.filter(msg => msg.id !== tempId)
+        } : null)
+        
+        // Restore message to input
+        setNewMessage(messageContent)
+        
+        // Could show an error notification here
+        alert('Failed to send message. Please try again.')
+      }
+      
     } catch (error) {
-      console.error('Failed to send message:', error)
+      console.error('Failed to prepare message:', error)
+      setNewMessage(messageContent) // Restore message
     } finally {
       setSending(false)
     }
@@ -466,12 +533,12 @@ export default function ConversationDetailPage() {
                     {isConnected ? (
                       <div className="flex items-center space-x-1 text-green-600">
                         <Wifi className="w-4 h-4" />
-                        <span className="text-xs">Live</span>
+                        <span className="text-xs">Live WebSocket</span>
                       </div>
                     ) : (
-                      <div className="flex items-center space-x-1 text-gray-400">
+                      <div className="flex items-center space-x-1 text-orange-500">
                         <WifiOff className="w-4 h-4" />
-                        <span className="text-xs">Offline</span>
+                        <span className="text-xs">REST API Mode</span>
                       </div>
                     )}
                   </div>

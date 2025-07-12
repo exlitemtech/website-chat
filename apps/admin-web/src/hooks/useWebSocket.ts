@@ -120,11 +120,14 @@ export function useWebSocket(
     if (websocket.current?.readyState === WebSocket.OPEN) {
       try {
         websocket.current.send(JSON.stringify(message))
+        return true
       } catch (error) {
         console.error('Failed to send WebSocket message:', error)
+        return false
       }
     } else {
-      console.warn('WebSocket is not connected')
+      console.warn('WebSocket is not connected, message not sent:', message)
+      return false
     }
   }, [])
 
