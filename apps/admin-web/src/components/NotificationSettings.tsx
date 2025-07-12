@@ -15,8 +15,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Badge,
-  Separator
+  Badge
 } from '@website-chat/ui'
 import { 
   Settings, 
@@ -161,7 +160,7 @@ export default function NotificationSettings({ children }: NotificationSettingsP
                   />
                 </div>
                 
-                <Separator />
+                <div className="border-t border-gray-200"></div>
                 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -274,7 +273,7 @@ export default function NotificationSettings({ children }: NotificationSettingsP
                   />
                 </div>
                 
-                <Separator />
+                <div className="border-t border-gray-200"></div>
                 
                 <div className="flex items-center justify-between">
                   <div>
