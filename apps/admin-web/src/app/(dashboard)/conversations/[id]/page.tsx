@@ -50,6 +50,7 @@ export default function ConversationDetailPage() {
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [messagesSentViaSocket, setMessagesSentViaSocket] = useState<Set<string>>(new Set())
+  const [serverError, setServerError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
 
@@ -216,8 +217,8 @@ export default function ConversationDetailPage() {
           // Transform API response to frontend format
           const transformedConversation: Conversation = {
             id: data.id,
-            website_name: data.website_name,
-            website_domain: data.website_domain,
+            website_name: data.website_name || 'Unknown Website',
+            website_domain: data.website_domain || 'unknown.com',
             visitor: {
               name: data.visitor_name || 'Anonymous User',
               email: data.visitor_email,
@@ -229,12 +230,12 @@ export default function ConversationDetailPage() {
               firstVisit: data.created_at,
               currentPage: '/'
             },
-            status: data.status as 'active' | 'waiting' | 'resolved',
+            status: (data.status as 'active' | 'waiting' | 'resolved') || 'active',
             priority: 'normal',
             assignedAgent: 'You',
             tags: [],
             created_at: data.created_at,
-            messages: data.messages.map((msg: any) => ({
+            messages: (data.messages || []).map((msg: any) => ({
               id: msg.id,
               content: msg.content,
               sender: msg.sender as 'visitor' | 'agent',
@@ -244,18 +245,73 @@ export default function ConversationDetailPage() {
           }
           
           setConversation(transformedConversation)
+        } else if (response.status === 404) {
+          console.error('Conversation not found')
+          setConversation(null)
+        } else if (response.status === 500) {
+          console.error('Server error loading conversation')
+          setServerError('Server error loading conversation. Some features may not work properly.')
+          // Create a fallback conversation object for better UX
+          const fallbackConversation: Conversation = {
+            id: conversationId,
+            website_name: 'Website',
+            website_domain: 'unknown.com',
+            visitor: {
+              name: 'Unknown Visitor',
+              email: undefined,
+              phone: undefined,
+              location: undefined,
+              userAgent: undefined,
+              referrer: undefined,
+              visitCount: 1,
+              firstVisit: new Date().toISOString(),
+              currentPage: '/'
+            },
+            status: 'active',
+            priority: 'normal',
+            assignedAgent: 'You',
+            tags: [],
+            created_at: new Date().toISOString(),
+            messages: []
+          }
+          setConversation(fallbackConversation)
         } else {
-          console.error('Failed to fetch conversation:', response.status)
+          console.error('Failed to fetch conversation:', response.status, await response.text())
         }
       } catch (error) {
         console.error('Error loading conversation:', error)
+        setServerError('Network error loading conversation. Using offline mode.')
+        // Show fallback conversation for network errors
+        const fallbackConversation: Conversation = {
+          id: conversationId,
+          website_name: 'Website',
+          website_domain: 'unknown.com',
+          visitor: {
+            name: 'Unknown Visitor',
+            email: undefined,
+            phone: undefined,
+            location: undefined,
+            userAgent: undefined,
+            referrer: undefined,
+            visitCount: 1,
+            firstVisit: new Date().toISOString(),
+            currentPage: '/'
+          },
+          status: 'active',
+          priority: 'normal',
+          assignedAgent: 'You',
+          tags: [],
+          created_at: new Date().toISOString(),
+          messages: []
+        }
+        setConversation(fallbackConversation)
       } finally {
         setLoading(false)
       }
     }
 
     loadConversation()
-  }, []) // Only run once on mount
+  }, [conversationId]) // Include conversationId as dependency
 
   useEffect(() => {
     scrollToBottom()
@@ -470,6 +526,16 @@ export default function ConversationDetailPage() {
 
   return (
     <div className="p-8">
+      {/* Server Error Banner */}
+      {serverError && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center">
+            <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
+            <span className="text-sm text-orange-700">{serverError}</span>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">

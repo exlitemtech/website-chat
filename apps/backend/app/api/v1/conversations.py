@@ -128,48 +128,98 @@ async def get_conversation(
 ):
     """Get a specific conversation with full details and message history"""
     
-    conversation = db.query(Conversation).filter(
-        Conversation.id == conversation_id
-    ).first()
-    
-    if not conversation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+    try:
+        # Query with eager loading of relationships
+        conversation = db.query(Conversation).filter(
+            Conversation.id == conversation_id
+        ).first()
+        
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+        
+        # Get all messages for this conversation
+        messages = db.query(Message).filter(
+            Message.conversation_id == conversation_id
+        ).order_by(Message.created_at).all()
+        
+        # Safely get website information
+        website_name = "Unknown Website"
+        website_domain = "unknown.com"
+        
+        try:
+            if conversation.website:
+                website_name = conversation.website.name or "Unknown Website"
+                website_domain = conversation.website.domain or "unknown.com"
+        except Exception as e:
+            print(f"Error accessing website data: {e}")
+        
+        # Safely get visitor information
+        visitor_name = "Anonymous User"
+        visitor_email = None
+        visitor_metadata = {}
+        
+        try:
+            if conversation.visitor:
+                visitor_name = getattr(conversation.visitor, 'name', None) or "Anonymous User"
+                visitor_email = getattr(conversation.visitor, 'email', None)
+                visitor_metadata = getattr(conversation.visitor, 'custom_data', None) or {}
+        except Exception as e:
+            print(f"Error accessing visitor data: {e}")
+        
+        # Safely handle status
+        status_value = "active"
+        try:
+            if hasattr(conversation.status, 'value'):
+                status_value = conversation.status.value.lower()
+            else:
+                status_value = str(conversation.status).lower()
+        except Exception as e:
+            print(f"Error accessing status: {e}")
+        
+        # Mark as read by agent
+        try:
+            conversation.last_agent_read_at = datetime.utcnow()
+            db.commit()
+        except Exception as e:
+            print(f"Error updating read timestamp: {e}")
+            db.rollback()
+        
+        return ConversationDetailResponse(
+            id=conversation.id,
+            website_id=conversation.website_id,
+            website_name=website_name,
+            website_domain=website_domain,
+            visitor_id=conversation.visitor_id,
+            visitor_name=visitor_name,
+            visitor_email=visitor_email,
+            visitor_metadata=visitor_metadata,
+            status=status_value,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at,
+            messages=[
+                MessageResponse(
+                    id=msg.id,
+                    content=msg.content,
+                    sender=msg.sender,
+                    timestamp=msg.created_at,
+                    message_metadata=msg.message_metadata or {}
+                )
+                for msg in messages
+            ]
         )
     
-    # Get all messages for this conversation
-    messages = db.query(Message).filter(
-        Message.conversation_id == conversation_id
-    ).order_by(Message.created_at).all()
-    
-    # Mark as read by agent
-    conversation.last_agent_read_at = datetime.utcnow()
-    db.commit()
-    
-    return ConversationDetailResponse(
-        id=conversation.id,
-        website_id=conversation.website_id,
-        website_name=conversation.website.name,
-        website_domain=conversation.website.domain,
-        visitor_id=conversation.visitor_id,
-        visitor_name=getattr(conversation.visitor, 'name', None) or "Anonymous User",
-        visitor_email=getattr(conversation.visitor, 'email', None),
-        visitor_metadata=getattr(conversation.visitor, 'custom_data', None) or {},
-        status=conversation.status.value.lower() if hasattr(conversation.status, 'value') else str(conversation.status).lower(),
-        created_at=conversation.created_at,
-        updated_at=conversation.updated_at,
-        messages=[
-            MessageResponse(
-                id=msg.id,
-                content=msg.content,
-                sender=msg.sender,
-                timestamp=msg.created_at,
-                message_metadata=msg.message_metadata or {}
-            )
-            for msg in messages
-        ]
-    )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"Unexpected error in get_conversation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.post("/{conversation_id}/messages", response_model=MessageResponse)
 async def send_message(
