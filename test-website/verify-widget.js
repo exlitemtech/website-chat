@@ -37,7 +37,7 @@ async function testWidget() {
             try {
                 const widget = window.WebsiteChat.init({
                     websiteId: 'test-123',
-                    apiUrl: 'http://localhost:8002',
+                    apiUrl: 'http://localhost:8000',
                     primaryColor: '#667eea',
                     position: 'bottom-right',
                     welcomeMessage: 'Test working!',

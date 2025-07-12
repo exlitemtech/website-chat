@@ -124,7 +124,13 @@ export class NotificationManager {
   }
 
   showNotification(type: NotificationType, options: NotificationOptions): Notification | null {
+    console.log('showNotification called:', type, options)
+    console.log('isNotificationAllowed:', this.isNotificationAllowed(type))
+    console.log('Permission status:', Notification.permission)
+    console.log('Preferences:', this.preferences)
+    
     if (!this.isNotificationAllowed(type)) {
+      console.log('Notification not allowed for type:', type)
       return null;
     }
 

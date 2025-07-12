@@ -49,10 +49,12 @@ export function useWebSocket(
     }
 
     try {
+      console.log('Attempting WebSocket connection to:', url)
       setConnectionState('connecting')
       websocket.current = new WebSocket(url)
 
       websocket.current.onopen = () => {
+        console.log('WebSocket connected successfully')
         setIsConnected(true)
         setConnectionState('connected')
         reconnectAttempts.current = 0
@@ -69,6 +71,7 @@ export function useWebSocket(
       }
 
       websocket.current.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason)
         setIsConnected(false)
         setConnectionState('disconnected')
         onDisconnect?.()
@@ -76,6 +79,7 @@ export function useWebSocket(
         // Attempt to reconnect if not a manual disconnect
         if (shouldReconnect.current && reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current++
+          console.log(`Attempting reconnect ${reconnectAttempts.current}/${maxReconnectAttempts}`)
           reconnectTimer.current = setTimeout(() => {
             connect()
           }, reconnectInterval)
@@ -83,6 +87,7 @@ export function useWebSocket(
       }
 
       websocket.current.onerror = (error) => {
+        console.error('WebSocket error:', error)
         setConnectionState('error')
         onError?.(error)
       }

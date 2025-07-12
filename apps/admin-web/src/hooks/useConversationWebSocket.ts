@@ -55,11 +55,12 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
 
   // Construct WebSocket URL
   const wsUrl = userId && token 
-    ? `ws://localhost:8002/ws/agent/${userId}?token=${encodeURIComponent(token)}`
+    ? `ws://localhost:8000/ws/agent/${userId}?token=${encodeURIComponent(token)}`
     : null
 
   const handleMessage = useCallback((message: any) => {
     setConnectionError(null)
+    console.log('WebSocket message received:', message.type, message)
     
     switch (message.type) {
       case 'connection_established':
@@ -76,6 +77,8 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
               message.message.sender_id !== userId &&
               (!currentConversationId || currentConversationId !== message.message.conversation_id)) {
             
+            console.log('Triggering notification for visitor message:', message.message)
+            
             const visitorName = message.visitor_name || `Visitor ${message.message.sender_id.slice(-4)}`
             const messageContent = message.message.content || 'New message received'
             
@@ -85,18 +88,25 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
                            messageContent.toLowerCase().includes('help')
             
             if (isUrgent) {
+              console.log('Showing urgent message notification')
               notifications.showUrgentMessage(
                 message.message.conversation_id,
                 visitorName,
                 messageContent
               )
             } else {
+              console.log('Showing new message notification')
               notifications.showNewMessage(
                 message.message.conversation_id,
                 visitorName,
                 messageContent
               )
             }
+          } else {
+            console.log('Notification not triggered. enableNotifications:', enableNotifications, 
+                       'sender:', message.message?.sender, 
+                       'currentConversationId:', currentConversationId,
+                       'messageConversationId:', message.message?.conversation_id)
           }
         }
         break
