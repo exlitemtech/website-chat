@@ -84,6 +84,7 @@ export default function ConversationDetailPage() {
     conversationId,
     enableNotifications: false, // Disable notifications in conversation view since user is actively viewing
     currentConversationId: conversationId, // Mark this as the currently viewed conversation
+    enabled: !!currentUser.id && !!currentUser.token, // Only enable WebSocket when user data is available
     onNewMessage: (message) => {
       if (conversation) {
         const newMsg: Message = {

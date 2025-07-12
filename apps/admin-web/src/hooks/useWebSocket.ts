@@ -12,6 +12,7 @@ interface UseWebSocketOptions {
   onError?: (error: Event) => void
   reconnectInterval?: number
   maxReconnectAttempts?: number
+  enabled?: boolean
 }
 
 interface UseWebSocketReturn {
@@ -32,7 +33,8 @@ export function useWebSocket(
     onDisconnect,
     onError,
     reconnectInterval = 3000,
-    maxReconnectAttempts = 5
+    maxReconnectAttempts = 5,
+    enabled = true
   } = options
 
   const [isConnected, setIsConnected] = useState(false)
@@ -44,12 +46,19 @@ export function useWebSocket(
   const shouldReconnect = useRef(true)
 
   const connect = useCallback(() => {
-    if (!url || websocket.current?.readyState === WebSocket.CONNECTING) {
+    if (!enabled || !url || websocket.current?.readyState === WebSocket.CONNECTING) {
+      return
+    }
+
+    // Don't attempt reconnection if we've exceeded max attempts
+    if (reconnectAttempts.current >= maxReconnectAttempts) {
+      console.warn('Max reconnection attempts reached. Stopping reconnection.')
+      setConnectionState('error')
       return
     }
 
     try {
-      console.log('Attempting WebSocket connection to:', url)
+      console.log('Attempting WebSocket connection to:', url, `(attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`)
       setConnectionState('connecting')
       websocket.current = new WebSocket(url)
 
@@ -76,13 +85,20 @@ export function useWebSocket(
         setConnectionState('disconnected')
         onDisconnect?.()
 
-        // Attempt to reconnect if not a manual disconnect
-        if (shouldReconnect.current && reconnectAttempts.current < maxReconnectAttempts) {
+        // Attempt to reconnect if not a manual disconnect and we haven't exceeded attempts
+        if (shouldReconnect.current && reconnectAttempts.current < maxReconnectAttempts && enabled) {
           reconnectAttempts.current++
-          console.log(`Attempting reconnect ${reconnectAttempts.current}/${maxReconnectAttempts}`)
+          
+          // Exponential backoff: 3s, 6s, 12s, 24s, 48s
+          const backoffDelay = reconnectInterval * Math.pow(2, reconnectAttempts.current - 1)
+          
+          console.log(`Attempting reconnect ${reconnectAttempts.current}/${maxReconnectAttempts} in ${backoffDelay}ms`)
           reconnectTimer.current = setTimeout(() => {
             connect()
-          }, reconnectInterval)
+          }, backoffDelay)
+        } else if (reconnectAttempts.current >= maxReconnectAttempts) {
+          console.error('Max WebSocket reconnection attempts reached. Stopping reconnection.')
+          setConnectionState('error')
         }
       }
 
@@ -96,7 +112,7 @@ export function useWebSocket(
       setConnectionState('error')
       console.error('WebSocket connection error:', error)
     }
-  }, [url, onMessage, onConnect, onDisconnect, onError, reconnectInterval, maxReconnectAttempts])
+  }, [enabled, url, onMessage, onConnect, onDisconnect, onError, reconnectInterval, maxReconnectAttempts])
 
   const disconnect = useCallback(() => {
     shouldReconnect.current = false
@@ -137,15 +153,17 @@ export function useWebSocket(
   }, [])
 
   useEffect(() => {
-    if (url) {
+    if (enabled && url) {
       connect()
+    } else if (!enabled) {
+      disconnect()
     }
 
     return () => {
       shouldReconnect.current = false
       disconnect()
     }
-  }, [url, connect, disconnect])
+  }, [enabled, url, connect, disconnect])
 
   return {
     isConnected,

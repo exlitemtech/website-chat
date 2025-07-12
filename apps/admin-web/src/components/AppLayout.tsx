@@ -89,7 +89,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     userId: mounted && user?.id ? user.id : '',
     token: mounted && typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '',
     enableNotifications: true,
-    currentConversationId: mounted && pathname.includes('/conversations/') ? pathname.split('/').pop() : undefined
+    currentConversationId: mounted && pathname.includes('/conversations/') ? pathname.split('/').pop() : undefined,
+    enabled: mounted && !!user?.id // Only enable WebSocket when user is loaded
   })
 
   const handleLogout = () => {

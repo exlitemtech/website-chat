@@ -31,6 +31,7 @@ interface UseConversationWebSocketOptions {
   onVisitorJoined?: (data: any) => void
   enableNotifications?: boolean
   currentConversationId?: string
+  enabled?: boolean
 }
 
 export function useConversationWebSocket(options: UseConversationWebSocketOptions) {
@@ -45,7 +46,8 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     onAgentLeft,
     onVisitorJoined,
     enableNotifications = true,
-    currentConversationId
+    currentConversationId,
+    enabled = true
   } = options
 
   const notifications = useNotifications()
@@ -199,7 +201,8 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     onDisconnect: handleDisconnect,
     onError: handleError,
     reconnectInterval: 3000,
-    maxReconnectAttempts: 5
+    maxReconnectAttempts: 5,
+    enabled: enabled && !!userId && !!token
   })
 
   // Join/leave conversation when conversationId changes
