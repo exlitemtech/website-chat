@@ -75,6 +75,12 @@ async def websocket_agent_endpoint(
                 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        print(f"WebSocket error for agent {user_id}: {e}")
+        try:
+            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except:
+            pass
     finally:
         connection_manager.disconnect(connection_id)
 
@@ -142,6 +148,12 @@ async def websocket_visitor_endpoint(
                 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        print(f"WebSocket error for visitor {visitor_id}: {e}")
+        try:
+            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except:
+            pass
     finally:
         connection_manager.disconnect(connection_id)
 

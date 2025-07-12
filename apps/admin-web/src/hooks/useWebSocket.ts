@@ -85,8 +85,18 @@ export function useWebSocket(
         setConnectionState('disconnected')
         onDisconnect?.()
 
+        // Don't reconnect for certain error codes
+        const shouldNotReconnect = [
+          4001, // Unauthorized
+          4004, // Website not found
+          4008, // Server at capacity
+        ].includes(event.code)
+
         // Attempt to reconnect if not a manual disconnect and we haven't exceeded attempts
-        if (shouldReconnect.current && reconnectAttempts.current < maxReconnectAttempts && enabled) {
+        if (shouldReconnect.current && 
+            reconnectAttempts.current < maxReconnectAttempts && 
+            enabled && 
+            !shouldNotReconnect) {
           reconnectAttempts.current++
           
           // Exponential backoff: 3s, 6s, 12s, 24s, 48s
@@ -96,8 +106,8 @@ export function useWebSocket(
           reconnectTimer.current = setTimeout(() => {
             connect()
           }, backoffDelay)
-        } else if (reconnectAttempts.current >= maxReconnectAttempts) {
-          console.error('Max WebSocket reconnection attempts reached. Stopping reconnection.')
+        } else if (reconnectAttempts.current >= maxReconnectAttempts || shouldNotReconnect) {
+          console.error('WebSocket reconnection stopped. Code:', event.code, 'Reason:', event.reason)
           setConnectionState('error')
         }
       }

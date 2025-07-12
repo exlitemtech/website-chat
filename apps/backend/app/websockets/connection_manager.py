@@ -21,11 +21,27 @@ class ConnectionManager:
         
         # Website subscriptions: website_id -> set of connection_ids
         self.website_subscriptions: Dict[str, Set[str]] = {}
+        
+        # Connection limits
+        self.max_connections_per_user = 5
+        self.max_total_connections = 100
 
     async def connect(self, websocket: WebSocket, connection_id: str, user_id: str, 
                      connection_type: str = "agent", website_id: Optional[str] = None,
                      visitor_id: Optional[str] = None):
         """Accept a new WebSocket connection"""
+        
+        # Check total connection limit
+        if len(self.active_connections) >= self.max_total_connections:
+            await websocket.close(code=4008, reason="Server at capacity")
+            raise Exception("Max total connections reached")
+        
+        # Check per-user connection limit
+        user_connections = len(self.user_subscriptions.get(user_id, set()))
+        if user_connections >= self.max_connections_per_user:
+            # Close oldest connection for this user
+            await self._cleanup_oldest_user_connection(user_id)
+        
         await websocket.accept()
         
         self.active_connections[connection_id] = websocket
@@ -50,6 +66,35 @@ class ConnectionManager:
             self.website_subscriptions[website_id].add(connection_id)
 
         print(f"WebSocket connection established: {connection_id} ({connection_type})")
+
+    async def _cleanup_oldest_user_connection(self, user_id: str):
+        """Close the oldest connection for a user to make room for a new one"""
+        if user_id not in self.user_subscriptions:
+            return
+            
+        user_connection_ids = list(self.user_subscriptions[user_id])
+        if not user_connection_ids:
+            return
+            
+        # Find oldest connection by creation time
+        oldest_connection_id = None
+        oldest_time = None
+        
+        for conn_id in user_connection_ids:
+            if conn_id in self.connection_info:
+                connected_at = self.connection_info[conn_id].get("connected_at")
+                if oldest_time is None or (connected_at and connected_at < oldest_time):
+                    oldest_time = connected_at
+                    oldest_connection_id = conn_id
+        
+        if oldest_connection_id and oldest_connection_id in self.active_connections:
+            try:
+                await self.active_connections[oldest_connection_id].close(code=4001, reason="Connection limit reached")
+                print(f"Closed oldest connection {oldest_connection_id} for user {user_id}")
+            except:
+                pass
+            finally:
+                self.disconnect(oldest_connection_id)
 
     def disconnect(self, connection_id: str):
         """Remove a WebSocket connection"""
