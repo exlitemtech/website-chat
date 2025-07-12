@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Widget Test</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Manual Widget Creation Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Manual DOM Creation</h2>
+        <button onclick="createManualWidget()">Create Manual Widget</button>
+        <p id="manual-result">Click button to test</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Load Widget CSS and JS</h2>
+        <button onclick="loadWidgetFiles()">Load Widget Files</button>
+        <p id="load-result">Click button to test</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Initialize Real Widget</h2>
+        <button onclick="initRealWidget()">Initialize Widget</button>
+        <p id="widget-result">Click button to test</p>
+    </div>
+
+    <script>
+        function createManualWidget() {
+            // Create container manually
+            const container = document.createElement('div');
+            container.className = 'wc-widget-container';
+            container.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 999999;
+                font-family: Arial, sans-serif;
+            `;
+            
+            // Create launcher manually
+            const launcher = document.createElement('button');
+            launcher.className = 'wc-launcher';
+            launcher.style.cssText = `
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #6366f1, #8b5cf6);
+                border: none;
+                cursor: pointer;
+                box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 24px;
+            `;
+            launcher.innerHTML = '💬';
+            launcher.onclick = () => alert('Manual widget clicked!');
+            
+            container.appendChild(launcher);
+            document.body.appendChild(container);
+            
+            document.getElementById('manual-result').textContent = 'Manual widget created! Check bottom-right corner.';
+        }
+        
+        function loadWidgetFiles() {
+            // Load CSS
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = '../apps/chat-widget/dist/website-chat-widget.css';
+            css.onload = () => {
+                console.log('CSS loaded');
+                document.getElementById('load-result').textContent = 'CSS loaded. ';
+                
+                // Load JS
+                const js = document.createElement('script');
+                js.src = '../apps/chat-widget/dist/website-chat-widget.iife.js';
+                js.onload = () => {
+                    console.log('JS loaded');
+                    document.getElementById('load-result').textContent += 'JS loaded. WebsiteChat available: ' + (!!window.WebsiteChat);
+                };
+                js.onerror = () => {
+                    document.getElementById('load-result').textContent += 'JS failed to load!';
+                };
+                document.head.appendChild(js);
+            };
+            css.onerror = () => {
+                document.getElementById('load-result').textContent = 'CSS failed to load!';
+            };
+            document.head.appendChild(css);
+        }
+        
+        function initRealWidget() {
+            if (!window.WebsiteChat) {
+                document.getElementById('widget-result').textContent = 'WebsiteChat not available! Load widget files first.';
+                return;
+            }
+            
+            try {
+                const widget = window.WebsiteChat.init({
+                    websiteId: 'manual-test-123',
+                    apiUrl: 'http://localhost:8002',
+                    primaryColor: '#ff6b6b',
+                    position: 'bottom-right',
+                    welcomeMessage: 'Manual test widget!',
+                    agentName: 'Manual Test'
+                });
+                
+                document.getElementById('widget-result').textContent = 'Widget initialized! Check bottom-right corner.';
+                
+                // Force debug styles
+                setTimeout(() => {
+                    const container = document.querySelector('.wc-widget-container');
+                    if (container) {
+                        container.style.border = '3px solid red';
+                        container.style.backgroundColor = 'rgba(255,0,0,0.1)';
+                        console.log('Applied debug styles to widget container');
+                    }
+                }, 100);
+                
+            } catch (error) {
+                document.getElementById('widget-result').textContent = 'Error: ' + error.message;
+                console.error('Widget init error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

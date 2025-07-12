@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal Widget Test</title>
+</head>
+<body>
+    <h1>Widget Test</h1>
+    <p>Check console for debug info. Widget should appear in bottom-right.</p>
+    
+    <link rel="stylesheet" href="../apps/chat-widget/dist/website-chat-widget.css">
+    <script src="../apps/chat-widget/dist/website-chat-widget.iife.js"></script>
+    
+    <script>
+        console.log('=== WIDGET DEBUG START ===');
+        console.log('1. Script loaded');
+        console.log('2. WebsiteChat available:', !!window.WebsiteChat);
+        console.log('3. WebsiteChat type:', typeof window.WebsiteChat);
+        
+        if (window.WebsiteChat) {
+            console.log('4. WebsiteChat methods:', Object.keys(window.WebsiteChat));
+            
+            try {
+                console.log('5. Attempting to initialize...');
+                const widget = window.WebsiteChat.init({
+                    websiteId: 'test-123',
+                    apiUrl: 'http://localhost:8002',
+                    primaryColor: '#ff0000',
+                    position: 'bottom-right',
+                    welcomeMessage: 'Test!',
+                    agentName: 'Test'
+                });
+                console.log('6. Widget instance:', widget);
+                
+                // Force check DOM after small delay
+                setTimeout(() => {
+                    const container = document.querySelector('.wc-widget-container');
+                    const launcher = document.querySelector('.wc-launcher');
+                    console.log('7. Container element:', container);
+                    console.log('8. Launcher element:', launcher);
+                    
+                    if (container) {
+                        console.log('9. Container styles:', {
+                            display: getComputedStyle(container).display,
+                            position: getComputedStyle(container).position,
+                            zIndex: getComputedStyle(container).zIndex,
+                            bottom: getComputedStyle(container).bottom,
+                            right: getComputedStyle(container).right,
+                            visibility: getComputedStyle(container).visibility
+                        });
+                        
+                        // Make it super visible for testing
+                        container.style.backgroundColor = 'red';
+                        container.style.border = '5px solid blue';
+                        console.log('10. Applied debug styles to container');
+                    }
+                    
+                    if (launcher) {
+                        console.log('11. Launcher styles:', {
+                            display: getComputedStyle(launcher).display,
+                            width: getComputedStyle(launcher).width,
+                            height: getComputedStyle(launcher).height
+                        });
+                        
+                        launcher.style.backgroundColor = 'yellow';
+                        launcher.style.border = '3px solid green';
+                        console.log('12. Applied debug styles to launcher');
+                    }
+                }, 500);
+                
+            } catch (error) {
+                console.error('Widget init error:', error);
+            }
+        } else {
+            console.error('WebsiteChat not found!');
+        }
+        console.log('=== WIDGET DEBUG END ===');
+    </script>
+</body>
+</html>

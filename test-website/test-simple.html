@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Widget Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-info { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Widget Test Page</h1>
+    <div class="test-info">
+        <p>This page tests if the chat widget loads correctly.</p>
+        <p>You should see a chat launcher in the bottom-right corner.</p>
+    </div>
+    
+    <!-- Widget files -->
+    <link rel="stylesheet" href="../apps/chat-widget/dist/website-chat-widget.css">
+    <script src="../apps/chat-widget/dist/website-chat-widget.iife.js"></script>
+    
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, checking for WebsiteChat...');
+            console.log('WebsiteChat type:', typeof WebsiteChat);
+            console.log('Window object keys containing Chat:', Object.keys(window).filter(k => k.includes('Chat')));
+            
+            // Give a bit more time for the script to fully load
+            setTimeout(() => {
+                console.log('After timeout - WebsiteChat:', typeof WebsiteChat);
+                
+                if (typeof WebsiteChat !== 'undefined') {
+                    try {
+                        console.log('Initializing widget...');
+                        const widget = WebsiteChat.init({
+                            websiteId: 'test-123',
+                            apiUrl: 'http://localhost:8002',
+                            primaryColor: '#667eea',
+                            position: 'bottom-right',
+                            welcomeMessage: 'Test widget working!',
+                            agentName: 'Test Agent'
+                        });
+                        console.log('Widget initialized successfully:', widget);
+                        
+                        // Check if DOM elements were created
+                        setTimeout(() => {
+                            const container = document.querySelector('.wc-widget-container');
+                            const launcher = document.querySelector('.wc-launcher');
+                            console.log('Container found:', !!container);
+                            console.log('Launcher found:', !!launcher);
+                            if (container) {
+                                console.log('Container styles:', getComputedStyle(container).display, getComputedStyle(container).position);
+                            }
+                        }, 100);
+                        
+                    } catch (error) {
+                        console.error('Widget initialization error:', error);
+                        console.error('Error stack:', error.stack);
+                    }
+                } else {
+                    console.error('WebsiteChat not found on window object!');
+                    console.log('Available on window:', Object.keys(window).filter(k => k.toLowerCase().includes('web')));
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>

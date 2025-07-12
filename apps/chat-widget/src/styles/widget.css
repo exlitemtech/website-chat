@@ -1,0 +1,470 @@
+/* Widget CSS - Isolated styles to avoid conflicts with host site */
+
+.wc-widget-container {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  position: fixed;
+  z-index: 2147483647; /* Maximum z-index */
+  bottom: 20px;
+  right: 20px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #1e293b;
+  direction: ltr;
+  text-align: left;
+}
+
+.wc-widget-container * {
+  box-sizing: border-box;
+}
+
+/* Chat Launcher Button */
+.wc-launcher {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  outline: none;
+}
+
+.wc-launcher:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 35px rgba(99, 102, 241, 0.4);
+}
+
+.wc-launcher:active {
+  transform: scale(0.95);
+}
+
+.wc-launcher-icon {
+  width: 24px;
+  height: 24px;
+  fill: white;
+  transition: transform 0.2s ease;
+}
+
+.wc-launcher.open .wc-launcher-icon {
+  transform: rotate(180deg);
+}
+
+/* Notification Badge */
+.wc-notification-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Chat Window */
+.wc-chat-window {
+  position: absolute;
+  bottom: 80px;
+  right: 0;
+  width: 380px;
+  height: 600px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  transform: scale(0.8) translateY(20px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.wc-chat-window.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+
+/* Chat Header */
+.wc-chat-header {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  padding: 20px;
+  color: white;
+  position: relative;
+}
+
+.wc-chat-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wc-agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.wc-agent-info h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wc-agent-info p {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.wc-close-button {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.wc-close-button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Messages Area */
+.wc-messages-container {
+  height: 400px;
+  overflow-y: auto;
+  padding: 20px;
+  background: #fafafa;
+}
+
+.wc-message {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wc-message.visitor {
+  flex-direction: row-reverse;
+}
+
+.wc-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.wc-message.visitor .wc-message-avatar {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+}
+
+.wc-message-content {
+  max-width: 240px;
+}
+
+.wc-message-bubble {
+  background: white;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  word-wrap: break-word;
+  position: relative;
+}
+
+.wc-message.visitor .wc-message-bubble {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+}
+
+.wc-message-time {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.wc-message.agent .wc-message-time {
+  text-align: left;
+}
+
+/* Typing Indicator */
+.wc-typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.wc-typing-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.wc-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  animation: typingPulse 1.4s infinite ease-in-out;
+}
+
+.wc-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.wc-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingPulse {
+  0%, 60%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Input Area */
+.wc-input-container {
+  padding: 20px;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+}
+
+.wc-input-wrapper {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+
+.wc-message-input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  resize: none;
+  min-height: 40px;
+  max-height: 100px;
+  line-height: 1.4;
+}
+
+.wc-message-input:focus {
+  border-color: #6366f1;
+}
+
+.wc-message-input::placeholder {
+  color: #94a3b8;
+}
+
+.wc-send-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.wc-send-button:hover {
+  transform: scale(1.05);
+}
+
+.wc-send-button:active {
+  transform: scale(0.95);
+}
+
+.wc-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.wc-send-icon {
+  width: 16px;
+  height: 16px;
+  fill: white;
+}
+
+/* Welcome Message */
+.wc-welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+}
+
+.wc-welcome-message h3 {
+  margin: 0 0 8px 0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.wc-welcome-message p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* File Upload */
+.wc-file-input {
+  display: none;
+}
+
+.wc-file-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.wc-file-button:hover {
+  background: #f1f5f9;
+}
+
+.wc-file-icon {
+  width: 16px;
+  height: 16px;
+  fill: #64748b;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 480px) {
+  .wc-widget-container {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .wc-chat-window {
+    width: 100%;
+    height: 100vh;
+    bottom: 0;
+    right: 0;
+    border-radius: 0;
+    transform: translateY(100%);
+  }
+
+  .wc-chat-window.open {
+    transform: translateY(0);
+  }
+
+  .wc-messages-container {
+    height: calc(100vh - 160px);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .wc-chat-window {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .wc-messages-container {
+    background: #0f172a;
+  }
+
+  .wc-message-bubble {
+    background: #334155;
+    color: #f1f5f9;
+    border-color: #475569;
+  }
+
+  .wc-message-avatar {
+    background: #475569;
+    color: #cbd5e1;
+  }
+
+  .wc-input-container {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .wc-message-input {
+    background: #334155;
+    border-color: #475569;
+    color: #f1f5f9;
+  }
+
+  .wc-message-input::placeholder {
+    color: #64748b;
+  }
+
+  .wc-welcome-message {
+    color: #94a3b8;
+  }
+
+  .wc-welcome-message h3 {
+    color: #f1f5f9;
+  }
+}

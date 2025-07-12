@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test E-commerce Store - Chat Widget Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: white;
+            color: #f5576c;
+            padding: 12px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: transform 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .products {
+            padding: 4rem 0;
+        }
+        
+        .products h2 {
+            text-align: center;
+            margin-bottom: 3rem;
+            font-size: 2.5rem;
+        }
+        
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        
+        .product-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #f0f2f0, #e8eae8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: #666;
+        }
+        
+        .product-info {
+            padding: 1.5rem;
+        }
+        
+        .product-info h3 {
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        
+        .product-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #f5576c;
+            margin-bottom: 1rem;
+        }
+        
+        .product-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .product-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+        }
+        
+        .chat-notice {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .chat-notice h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .chat-notice p {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <div class="logo">TechStore</div>
+                <ul class="nav-links">
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#products">Products</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero" id="home">
+        <div class="container">
+            <h1>Premium Tech Products</h1>
+            <p>Discover the latest in technology with our curated collection</p>
+            <a href="#products" class="btn">Shop Now</a>
+        </div>
+    </section>
+
+    <section class="products" id="products">
+        <div class="container">
+            <h2>Featured Products</h2>
+            
+            <div class="chat-notice">
+                <h3>🎉 Chat Widget is Live!</h3>
+                <p>Need help? Try our live chat widget in the bottom-right corner. Ask questions about our products and get instant support!</p>
+            </div>
+            
+            <div class="product-grid">
+                <div class="product-card">
+                    <div class="product-image">🎧</div>
+                    <div class="product-info">
+                        <h3>Wireless Headphones</h3>
+                        <div class="product-price">$199.99</div>
+                        <p>Premium noise-cancelling wireless headphones with 30-hour battery life.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-image">📱</div>
+                    <div class="product-info">
+                        <h3>Smartphone Pro</h3>
+                        <div class="product-price">$899.99</div>
+                        <p>Latest flagship smartphone with advanced camera and lightning-fast performance.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-image">💻</div>
+                    <div class="product-info">
+                        <h3>Laptop Ultra</h3>
+                        <div class="product-price">$1,299.99</div>
+                        <p>Lightweight laptop with powerful processor and all-day battery life.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-image">⌚</div>
+                    <div class="product-info">
+                        <h3>Smart Watch</h3>
+                        <div class="product-price">$299.99</div>
+                        <p>Health and fitness tracking with smart notifications and GPS.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-image">📷</div>
+                    <div class="product-info">
+                        <h3>Digital Camera</h3>
+                        <div class="product-price">$699.99</div>
+                        <p>Professional-grade camera with 4K video recording capabilities.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+                
+                <div class="product-card">
+                    <div class="product-image">🔊</div>
+                    <div class="product-info">
+                        <h3>Bluetooth Speaker</h3>
+                        <div class="product-price">$149.99</div>
+                        <p>Portable speaker with deep bass and waterproof design.</p>
+                        <button class="product-btn">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 TechStore. All rights reserved. | Chat widget powered by Website Chat</p>
+        </div>
+    </footer>
+
+    <!-- Chat Widget Integration -->
+    <link rel="stylesheet" href="../apps/chat-widget/dist/website-chat-widget.css">
+    <script src="../apps/chat-widget/dist/website-chat-widget.iife.js"></script>
+    <script>
+        // Wait for DOM to be ready and add debugging
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM ready, WebsiteChat available:', !!window.WebsiteChat);
+            
+            if (window.WebsiteChat) {
+                try {
+                    // Initialize the chat widget
+                    const widget = WebsiteChat.init({
+                        websiteId: 'demo-website-1',
+                        apiUrl: 'http://localhost:8000',
+                        primaryColor: '#667eea',
+                        position: 'bottom-right',
+                        welcomeMessage: 'Hi! Welcome to TechStore. How can I help you today?',
+                        agentName: 'TechStore Support',
+                        enableFileUpload: true,
+                        enableEmoji: true
+                    });
+                    
+                    console.log('Widget initialized:', widget);
+                    
+                    // Debug visitor ID persistence
+                    console.log('Visitor ID from localStorage:', localStorage.getItem('website-chat-visitor-id'));
+                    console.log('Conversation ID from localStorage:', localStorage.getItem('website-chat-conversation-id'));
+                    
+                    // Add debug styles after short delay
+                    setTimeout(() => {
+                        const container = document.querySelector('.wc-widget-container');
+                        const launcher = document.querySelector('.wc-launcher');
+                        
+                        if (container) {
+                            console.log('Widget container found');
+                            container.style.border = '2px solid red';
+                            container.style.backgroundColor = 'rgba(255,0,0,0.1)';
+                        } else {
+                            console.error('Widget container NOT found');
+                        }
+                        
+                        if (launcher) {
+                            console.log('Widget launcher found');
+                            launcher.style.border = '2px solid blue';
+                        } else {
+                            console.error('Widget launcher NOT found');
+                        }
+                    }, 200);
+                    
+                } catch (error) {
+                    console.error('Widget initialization failed:', error);
+                }
+            } else {
+                console.error('WebsiteChat not available on window object');
+            }
+        });
+
+        // Add some interactivity for demo
+        document.querySelectorAll('.product-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const productName = btn.closest('.product-card').querySelector('h3').textContent;
+                alert(`Added ${productName} to cart! Try the chat widget for support.`);
+            });
+        });
+    </script>
+</body>
+</html>

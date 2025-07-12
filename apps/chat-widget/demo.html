@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Chat Widget Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .hero {
+            margin-bottom: 60px;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+        
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            margin-bottom: 40px;
+        }
+        
+        .demo-section h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        
+        .demo-section p {
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+        
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            text-align: left;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        .integration-examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .integration-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .integration-card h3 {
+            margin-top: 0;
+            color: #fbbf24;
+        }
+        
+        .feature-list {
+            text-align: left;
+            margin: 20px 0;
+        }
+        
+        .feature-list li {
+            margin: 8px 0;
+            opacity: 0.9;
+        }
+        
+        .cta {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .cta-text {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        
+        .note {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .note-title {
+            font-weight: 600;
+            color: #fbbf24;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero">
+            <h1>🚀 Website Chat Widget</h1>
+            <p>A beautiful, modern chat widget that can be embedded on any website</p>
+        </div>
+
+        <div class="demo-section">
+            <h2>✨ Live Demo</h2>
+            <p>The chat widget is already loaded on this page! Click the chat button in the bottom-right corner to try it out.</p>
+            
+            <div class="note">
+                <div class="note-title">Demo Features:</div>
+                <ul class="feature-list">
+                    <li>💬 Real-time chat interface with mock responses</li>
+                    <li>🎨 Professional UI with gradients and animations</li>
+                    <li>📱 Fully responsive design (try on mobile!)</li>
+                    <li>🌙 Dark mode support</li>
+                    <li>📄 Typing indicators and smooth scrolling</li>
+                    <li>🔔 Notification badges for unread messages</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🛠️ Easy Integration</h2>
+            <p>Add the chat widget to your website with just a few lines of code:</p>
+            
+            <div class="integration-examples">
+                <div class="integration-card">
+                    <h3>📝 Simple HTML Integration</h3>
+                    <p>Just add these two lines to your HTML:</p>
+                    <div class="code-block">
+&lt;link rel="stylesheet" href="website-chat-widget.css"&gt;
+&lt;script src="website-chat-widget.iife.js" 
+        data-website-id="your-website-id"
+        data-api-url="https://your-api.com"
+        data-primary-color="#6366f1"&gt;&lt;/script&gt;
+                    </div>
+                </div>
+
+                <div class="integration-card">
+                    <h3>⚙️ JavaScript API</h3>
+                    <p>For more control, use the JavaScript API:</p>
+                    <div class="code-block">
+WebsiteChat.init({
+  websiteId: 'your-website-id',
+  apiUrl: 'https://your-api.com',
+  primaryColor: '#6366f1',
+  position: 'bottom-right',
+  welcomeMessage: 'Hi! How can we help?',
+  agentName: 'Support Team'
+})
+                    </div>
+                </div>
+
+                <div class="integration-card">
+                    <h3>🎨 Customization Options</h3>
+                    <ul class="feature-list">
+                        <li>Custom primary colors</li>
+                        <li>Position (bottom-right/bottom-left)</li>
+                        <li>Welcome messages</li>
+                        <li>Agent names and avatars</li>
+                        <li>File upload toggle</li>
+                        <li>Emoji support toggle</li>
+                    </ul>
+                </div>
+
+                <div class="integration-card">
+                    <h3>📋 Configuration Reference</h3>
+                    <div class="code-block">
+{
+  websiteId: string,      // Required
+  apiUrl?: string,        // API endpoint
+  primaryColor?: string,  // Hex color
+  position?: string,      // 'bottom-right' | 'bottom-left'
+  welcomeMessage?: string,
+  agentName?: string,
+  agentAvatar?: string,   // Image URL
+  enableFileUpload?: boolean,
+  enableEmoji?: boolean
+}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cta">
+            <div class="cta-text">
+                🎯 Ready to add this chat widget to your website?<br>
+                Check out the integration documentation and API reference.
+            </div>
+            <p>Widget size: <strong>11.3 KB JS + 6.0 KB CSS</strong> (gzipped: 3.9 KB + 1.7 KB)</p>
+        </div>
+    </div>
+
+    <!-- Load the chat widget -->
+    <link rel="stylesheet" href="dist/website-chat-widget.css">
+    <script 
+        src="dist/website-chat-widget.iife.js"
+        data-website-id="demo-website"
+        data-api-url="http://localhost:8000"
+        data-primary-color="#6366f1"
+        data-welcome-message="Welcome to our demo! This is a fully functional chat widget."
+        data-agent-name="Demo Support"
+    ></script>
+</body>
+</html>
