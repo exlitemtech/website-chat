@@ -1,5 +1,6 @@
 import json
 import uuid
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -27,15 +28,18 @@ async def websocket_agent_endpoint(
     try:
         user = await get_current_user_websocket(token, db)
         if not user or str(user.id) != user_id:
+            print(f"Authentication failed: user={user}, user_id={user_id}")
             await websocket.close(code=4001, reason="Unauthorized")
             return
     except Exception as e:
+        print(f"Authentication error: {e}")
         await websocket.close(code=4001, reason="Authentication failed")
         return
     
     connection_id = str(uuid.uuid4())
     
     try:
+        print(f"Attempting to connect WebSocket for agent {user_id}")
         # Connect to WebSocket
         await connection_manager.connect(
             websocket=websocket,
@@ -43,14 +47,23 @@ async def websocket_agent_endpoint(
             user_id=user_id,
             connection_type="agent"
         )
+        print(f"WebSocket connected successfully for agent {user_id}")
         
-        # Send connection confirmation
-        await connection_manager.send_personal_message({
-            "type": "connection_established",
-            "connection_id": connection_id,
-            "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
-        }, connection_id)
+        # Send connection confirmation immediately (no delay needed)
+        try:
+            await connection_manager.send_personal_message({
+                "type": "connection_established",
+                "connection_id": connection_id,
+                "user_id": user_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }, connection_id)
+            print(f"✅ Sent connection confirmation to {connection_id}")
+        except WebSocketDisconnect:
+            print(f"🔌 Client disconnected before confirmation could be sent to {connection_id}")
+            return  # Exit early if client already disconnected
+        except Exception as e:
+            print(f"❌ Failed to send connection confirmation: {e}")
+            # Don't close connection just because initial message failed
         
         # Handle incoming messages
         while True:
@@ -116,6 +129,9 @@ async def websocket_visitor_endpoint(
             visitor_id=visitor_id
         )
         
+        # Give WebSocket a moment to be ready before sending initial message
+        await asyncio.sleep(0.1)
+        
         # Send connection confirmation
         await connection_manager.send_personal_message({
             "type": "connection_established",
@@ -161,7 +177,15 @@ async def handle_agent_message(message_data: dict, connection_id: str, user_id: 
     """Handle messages from agents"""
     message_type = message_data.get("type")
     
-    if message_type == "join_conversation":
+    if message_type == "ping":
+        # Respond to heartbeat ping
+        await connection_manager.send_personal_message({
+            "type": "pong",
+            "timestamp": datetime.utcnow().isoformat()
+        }, connection_id)
+        return
+    
+    elif message_type == "join_conversation":
         conversation_id = message_data.get("conversation_id")
         if conversation_id:
             # Subscribe to conversation updates
@@ -218,7 +242,15 @@ async def handle_visitor_message(message_data: dict, connection_id: str, visitor
     """Handle messages from visitors"""
     message_type = message_data.get("type")
     
-    if message_type == "join_conversation":
+    if message_type == "ping":
+        # Respond to heartbeat ping
+        await connection_manager.send_personal_message({
+            "type": "pong",
+            "timestamp": datetime.utcnow().isoformat()
+        }, connection_id)
+        return
+    
+    elif message_type == "join_conversation":
         conversation_id = message_data.get("conversation_id")
         if conversation_id:
             connection_manager.subscribe_to_conversation(connection_id, conversation_id)

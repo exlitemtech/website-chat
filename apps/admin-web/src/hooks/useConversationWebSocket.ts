@@ -1,6 +1,30 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
 import { useNotifications } from './useNotifications'
+import { API_ENDPOINTS } from '@/config/api'
+
+// Simple JWT token validation
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const exp = payload.exp * 1000 // Convert to milliseconds
+    const now = Date.now()
+    const timeToExpiry = exp - now
+    
+    console.log('JWT Token Debug:', {
+      userId: payload.sub,
+      expiresAt: new Date(exp).toISOString(),
+      currentTime: new Date(now).toISOString(),
+      timeToExpiry: `${Math.round(timeToExpiry / 1000)}s`,
+      isExpired: now >= exp
+    })
+    
+    return now >= exp
+  } catch (error) {
+    console.error('Error parsing JWT token:', error)
+    return true // Assume expired if can't parse
+  }
+}
 
 interface Message {
   id: string
@@ -55,10 +79,32 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  // Construct WebSocket URL
-  const wsUrl = userId && token 
-    ? `ws://localhost:8000/ws/agent/${userId}?token=${encodeURIComponent(token)}`
+  // Check token expiration before creating WebSocket URL
+  const isTokenValid = token && !isTokenExpired(token)
+  
+  // Construct WebSocket URL using config only if token is valid
+  const wsUrl = userId && token && isTokenValid
+    ? API_ENDPOINTS.wsAgent(userId, token)
     : null
+    
+  // Debug WebSocket URL construction
+  useEffect(() => {
+    if (wsUrl) {
+      console.log('WebSocket URL constructed:', wsUrl)
+      console.log('Token length:', token?.length)
+      console.log('Token starts with:', token?.substring(0, 20) + '...')
+    }
+  }, [wsUrl, token])
+  
+  // Track token expiration
+  useEffect(() => {
+    if (token && isTokenExpired(token)) {
+      console.warn('JWT token is expired, WebSocket connection will fail')
+      setConnectionError('Authentication token expired')
+    } else if (token) {
+      console.log('JWT token is valid for WebSocket connection')
+    }
+  }, [token])
 
   const handleMessage = useCallback((message: any) => {
     setConnectionError(null)
@@ -66,7 +112,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     
     switch (message.type) {
       case 'connection_established':
-        console.log('WebSocket connected:', message)
+        console.log('✅ WebSocket connection confirmed by backend:', message)
         break
         
       case 'new_message':
@@ -192,16 +238,37 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
 
   const handleError = useCallback((error: Event) => {
     console.error('WebSocket error:', error)
-    setConnectionError('Connection error occurred')
-  }, [])
+    
+    // Check if this might be a token expiration issue
+    const wsTarget = error.target as WebSocket
+    if (wsTarget && wsTarget.readyState === WebSocket.CLOSED) {
+      console.warn('WebSocket immediately closed - possible authentication issue')
+      console.warn('WebSocket URL:', wsTarget.url)
+      
+      // Log connection debugging info
+      console.group('WebSocket Connection Debug')
+      console.log('URL:', wsTarget.url)
+      console.log('ReadyState:', wsTarget.readyState)
+      console.log('UserId:', userId)
+      console.log('Token Valid:', isTokenValid)
+      if (token) {
+        isTokenExpired(token) // This will log token debug info
+      }
+      console.groupEnd()
+      
+      setConnectionError('Connection failed - check authentication')
+    } else {
+      setConnectionError('Connection error occurred')
+    }
+  }, [userId, token, isTokenValid])
 
   const { isConnected, send, disconnect, reconnect, connectionState } = useWebSocket(wsUrl, {
     onMessage: handleMessage,
     onConnect: handleConnect,
     onDisconnect: handleDisconnect,
     onError: handleError,
-    reconnectInterval: 3000,
-    maxReconnectAttempts: 5,
+    reconnectInterval: 3000, // Faster initial reconnect
+    maxReconnectAttempts: 5, // More attempts for better resilience
     enabled: enabled && !!userId && !!token
   })
 

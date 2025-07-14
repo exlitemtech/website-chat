@@ -53,6 +53,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const [isConversationView, setIsConversationView] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   
@@ -61,6 +62,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
   useEffect(() => {
     setMounted(true)
   }, [])
+  
+  // Track if we're in conversation view
+  useEffect(() => {
+    if (mounted) {
+      setIsConversationView(pathname.includes('/conversations/') && pathname.split('/').length > 3)
+    }
+  }, [mounted, pathname])
 
   useEffect(() => {
     if (!mounted) return
@@ -89,8 +97,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     userId: mounted && user?.id ? user.id : '',
     token: mounted && typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '',
     enableNotifications: true,
-    currentConversationId: mounted && pathname.includes('/conversations/') ? pathname.split('/').pop() : undefined,
-    enabled: mounted && !!user?.id && !pathname.includes('/conversations/') // Disable when viewing specific conversation to prevent duplicate connections
+    currentConversationId: isConversationView ? pathname.split('/').pop() : undefined,
+    enabled: mounted && !!user?.id && !isConversationView // Disable when viewing specific conversation to prevent duplicate connections
   })
 
   const handleLogout = () => {

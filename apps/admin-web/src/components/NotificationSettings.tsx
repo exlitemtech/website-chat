@@ -66,7 +66,7 @@ export default function NotificationSettings({ children }: NotificationSettingsP
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      <DialogTrigger asChild={!!children}>
         {children || (
           <Button variant="ghost" size="icon">
             <Settings className="h-4 w-4" />

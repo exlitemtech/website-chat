@@ -23,26 +23,43 @@ class ConnectionManager:
         self.website_subscriptions: Dict[str, Set[str]] = {}
         
         # Connection limits
-        self.max_connections_per_user = 5
-        self.max_total_connections = 100
+        self.max_connections_per_user = 1  # One WebSocket per agent session
+        self.max_total_connections = 100  # Reduced for better resource management
+        
+        # Connection cleanup settings
+        self.idle_timeout = 300  # 5 minutes idle timeout
+        self.cleanup_interval = 60  # Check for idle connections every minute
 
     async def connect(self, websocket: WebSocket, connection_id: str, user_id: str, 
                      connection_type: str = "agent", website_id: Optional[str] = None,
                      visitor_id: Optional[str] = None):
         """Accept a new WebSocket connection"""
         
+        # Clean up idle connections first
+        await self._cleanup_idle_connections()
+        
         # Check total connection limit
         if len(self.active_connections) >= self.max_total_connections:
             await websocket.close(code=4008, reason="Server at capacity")
             raise Exception("Max total connections reached")
         
-        # Check per-user connection limit
-        user_connections = len(self.user_subscriptions.get(user_id, set()))
-        if user_connections >= self.max_connections_per_user:
-            # Close oldest connection for this user
-            await self._cleanup_oldest_user_connection(user_id)
+        # For agents, enforce strict 1 connection per user - close ALL existing connections
+        if connection_type == "agent":
+            print(f"Agent connection request for user {user_id}, checking existing connections...")
+            existing_count = len(self.user_subscriptions.get(user_id, set()))
+            print(f"Found {existing_count} existing connections for user {user_id}")
+            if existing_count > 0:
+                await self._close_all_user_connections(user_id, "New agent connection established")
+            
+        # For visitors, allow the configured limit
+        elif connection_type == "visitor":
+            user_connections = len(self.user_subscriptions.get(user_id, set()))
+            if user_connections >= self.max_connections_per_user:
+                await self._cleanup_oldest_user_connection(user_id)
+                await asyncio.sleep(0.1)
         
         await websocket.accept()
+        print(f"WebSocket accepted for {connection_type} {user_id}")
         
         self.active_connections[connection_id] = websocket
         self.connection_info[connection_id] = {
@@ -65,7 +82,31 @@ class ConnectionManager:
                 self.website_subscriptions[website_id] = set()
             self.website_subscriptions[website_id].add(connection_id)
 
-        print(f"WebSocket connection established: {connection_id} ({connection_type})")
+        print(f"WebSocket connection established: {connection_id} ({connection_type}) - Total: {len(self.active_connections)}")
+
+    async def _close_all_user_connections(self, user_id: str, reason: str = "Connection replaced"):
+        """Close all existing connections for a user (used for agents)"""
+        if user_id not in self.user_subscriptions:
+            return
+            
+        user_connection_ids = list(self.user_subscriptions[user_id])
+        if not user_connection_ids:
+            return
+            
+        print(f"Closing {len(user_connection_ids)} existing connections for user {user_id}")
+        
+        for conn_id in user_connection_ids:
+            if conn_id in self.active_connections:
+                try:
+                    await self.active_connections[conn_id].close(code=4010, reason=reason)
+                    print(f"Closed connection {conn_id} for user {user_id}: {reason}")
+                except Exception as e:
+                    print(f"Error closing connection {conn_id}: {e}")
+                finally:
+                    self.disconnect(conn_id)
+        
+        # Small delay to ensure cleanup is complete
+        await asyncio.sleep(0.2)
 
     async def _cleanup_oldest_user_connection(self, user_id: str):
         """Close the oldest connection for a user to make room for a new one"""
@@ -89,12 +130,39 @@ class ConnectionManager:
         
         if oldest_connection_id and oldest_connection_id in self.active_connections:
             try:
-                await self.active_connections[oldest_connection_id].close(code=4001, reason="Connection limit reached")
+                await self.active_connections[oldest_connection_id].close(code=4009, reason="Connection limit reached")
                 print(f"Closed oldest connection {oldest_connection_id} for user {user_id}")
             except:
                 pass
             finally:
                 self.disconnect(oldest_connection_id)
+    
+    async def _cleanup_idle_connections(self):
+        """Clean up idle connections that have exceeded the timeout"""
+        current_time = datetime.utcnow()
+        connections_to_remove = []
+        
+        for connection_id, info in self.connection_info.items():
+            try:
+                last_seen = datetime.fromisoformat(info.get("last_seen", info.get("connected_at", "")))
+                idle_time = (current_time - last_seen).total_seconds()
+                
+                if idle_time > self.idle_timeout:
+                    connections_to_remove.append(connection_id)
+                    
+            except (ValueError, TypeError):
+                # If timestamp parsing fails, consider it idle
+                connections_to_remove.append(connection_id)
+        
+        for connection_id in connections_to_remove:
+            if connection_id in self.active_connections:
+                try:
+                    await self.active_connections[connection_id].close(code=4002, reason="Idle timeout")
+                    print(f"Closed idle connection {connection_id}")
+                except:
+                    pass
+                finally:
+                    self.disconnect(connection_id)
 
     def disconnect(self, connection_id: str):
         """Remove a WebSocket connection"""
@@ -136,17 +204,29 @@ class ConnectionManager:
     async def send_personal_message(self, message: dict, connection_id: str):
         """Send a message to a specific connection"""
         if connection_id in self.active_connections:
+            websocket = self.active_connections[connection_id]
             try:
-                await self.active_connections[connection_id].send_text(json.dumps(message))
+                # Check if WebSocket is still open
+                if websocket.client_state.value == 3:  # CLOSED state
+                    print(f"WebSocket {connection_id} is already closed, removing connection")
+                    self.disconnect(connection_id)
+                    return
+                
+                await websocket.send_text(json.dumps(message))
                 
                 # Update last seen
                 if connection_id in self.connection_info:
                     self.connection_info[connection_id]["last_seen"] = datetime.utcnow().isoformat()
                     
             except Exception as e:
-                print(f"Error sending message to {connection_id}: {e}")
+                error_msg = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
+                print(f"Error sending message to {connection_id}: {error_msg}")
                 # Connection is broken, remove it
                 self.disconnect(connection_id)
+                # Re-raise WebSocketDisconnect to let the endpoint handle it properly
+                from fastapi import WebSocketDisconnect
+                if isinstance(e, WebSocketDisconnect):
+                    raise e
 
     async def broadcast_to_conversation(self, message: dict, conversation_id: str, 
                                       exclude_connection: Optional[str] = None):

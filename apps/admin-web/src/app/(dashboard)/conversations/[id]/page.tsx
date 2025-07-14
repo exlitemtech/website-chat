@@ -6,6 +6,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Textarea } fro
 import { ArrowLeft, Send, User, Globe, Clock, CheckCircle, AlertCircle, Phone, Mail, MapPin, Wifi, WifiOff } from 'lucide-react'
 import Link from 'next/link'
 import { useConversationWebSocket } from '@/hooks/useConversationWebSocket'
+import { API_BASE_URL } from '@/config/api'
 
 interface Message {
   id: string
@@ -207,7 +208,7 @@ export default function ConversationDetailPage() {
           return
         }
 
-        const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -380,7 +381,7 @@ export default function ConversationDetailPage() {
           const token = currentUser.token
           if (!token) throw new Error('No authentication token')
           
-          const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
+          const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}/messages`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
