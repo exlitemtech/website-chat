@@ -1,5 +1,30 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useWebSocket } from './useWebSocket'
+import { useNotifications } from './useNotifications'
+import { API_ENDPOINTS } from '@/config/api'
+
+// Simple JWT token validation
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const exp = payload.exp * 1000 // Convert to milliseconds
+    const now = Date.now()
+    const timeToExpiry = exp - now
+    
+    console.log('JWT Token Debug:', {
+      userId: payload.sub,
+      expiresAt: new Date(exp).toISOString(),
+      currentTime: new Date(now).toISOString(),
+      timeToExpiry: `${Math.round(timeToExpiry / 1000)}s`,
+      isExpired: now >= exp
+    })
+    
+    return now >= exp
+  } catch (error) {
+    console.error('Error parsing JWT token:', error)
+    return true // Assume expired if can't parse
+  }
+}
 
 interface Message {
   id: string
@@ -28,6 +53,9 @@ interface UseConversationWebSocketOptions {
   onAgentJoined?: (data: any) => void
   onAgentLeft?: (data: any) => void
   onVisitorJoined?: (data: any) => void
+  enableNotifications?: boolean
+  currentConversationId?: string
+  enabled?: boolean
 }
 
 export function useConversationWebSocket(options: UseConversationWebSocketOptions) {
@@ -40,28 +68,112 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     onTypingStop,
     onAgentJoined,
     onAgentLeft,
-    onVisitorJoined
+    onVisitorJoined,
+    enableNotifications = true,
+    currentConversationId,
+    enabled = true
   } = options
+
+  // Stable hook instance reference
+  const hookInstanceRef = useRef(Math.random().toString(36).substr(2, 9))
+
+  const notifications = useNotifications()
+
+  // Use refs to store callbacks to prevent unnecessary re-renders
+  const callbacksRef = useRef({
+    onNewMessage,
+    onTypingStart,
+    onTypingStop,
+    onAgentJoined,
+    onAgentLeft,
+    onVisitorJoined
+  })
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    callbacksRef.current = {
+      onNewMessage,
+      onTypingStart,
+      onTypingStop,
+      onAgentJoined,
+      onAgentLeft,
+      onVisitorJoined
+    }
+  }, [onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined])
 
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  // Construct WebSocket URL
-  const wsUrl = userId && token 
-    ? `ws://localhost:8002/ws/agent/${userId}?token=${encodeURIComponent(token)}`
-    : null
+  // Check token expiration before creating WebSocket URL
+  const isTokenValid = token && !isTokenExpired(token)
+  
+  // Memoize WebSocket URL to prevent unnecessary reconnections
+  const wsUrl = useMemo(() => {
+    if (userId && token && isTokenValid) {
+      return API_ENDPOINTS.wsAgent(userId, token)
+    }
+    return null
+  }, [userId, token, isTokenValid])
+    
+  // Track token expiration
+  useEffect(() => {
+    if (token && isTokenExpired(token)) {
+      setConnectionError('Authentication token expired')
+    }
+  }, [token])
 
   const handleMessage = useCallback((message: any) => {
     setConnectionError(null)
+    console.log('WebSocket message received:', message.type, message)
     
     switch (message.type) {
       case 'connection_established':
-        console.log('WebSocket connected:', message)
+        console.log('✅ WebSocket connection confirmed by backend:', message)
         break
         
       case 'new_message':
+        console.log('🔔 Received new_message via WebSocket:', message.message)
         if (message.message) {
-          onNewMessage?.(message.message)
+          console.log('🔔 Calling onNewMessage callback with:', message.message)
+          callbacksRef.current.onNewMessage?.(message.message)
+          
+          // Show notification for new messages from visitors
+          if (enableNotifications && 
+              message.message.sender === 'visitor' && 
+              message.message.sender_id !== userId &&
+              (!currentConversationId || currentConversationId !== message.message.conversation_id)) {
+            
+            console.log('Triggering notification for visitor message:', message.message)
+            
+            const visitorName = message.visitor_name || `Visitor ${message.message.sender_id.slice(-4)}`
+            const messageContent = message.message.content || 'New message received'
+            
+            // Check if this is marked as urgent
+            const isUrgent = message.message.metadata?.urgent || 
+                           messageContent.toLowerCase().includes('urgent') ||
+                           messageContent.toLowerCase().includes('help')
+            
+            if (isUrgent) {
+              console.log('Showing urgent message notification')
+              notifications.showUrgentMessage(
+                message.message.conversation_id,
+                visitorName,
+                messageContent
+              )
+            } else {
+              console.log('Showing new message notification')
+              notifications.showNewMessage(
+                message.message.conversation_id,
+                visitorName,
+                messageContent
+              )
+            }
+          } else {
+            console.log('Notification not triggered. enableNotifications:', enableNotifications, 
+                       'sender:', message.message?.sender, 
+                       'currentConversationId:', currentConversationId,
+                       'messageConversationId:', message.message?.conversation_id)
+          }
         }
         break
         
@@ -69,7 +181,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
         const startTypingId = message.user_id || message.visitor_id
         if (startTypingId && startTypingId !== userId) {
           setTypingUsers(prev => new Set(prev).add(startTypingId))
-          onTypingStart?.(message)
+          callbacksRef.current.onTypingStart?.(message)
         }
         break
         
@@ -81,20 +193,37 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
             newSet.delete(stopTypingId)
             return newSet
           })
-          onTypingStop?.(message)
+          callbacksRef.current.onTypingStop?.(message)
         }
         break
         
       case 'agent_joined':
-        onAgentJoined?.(message)
+        callbacksRef.current.onAgentJoined?.(message)
         break
         
       case 'agent_left':
-        onAgentLeft?.(message)
+        callbacksRef.current.onAgentLeft?.(message)
         break
         
       case 'visitor_joined':
-        onVisitorJoined?.(message)
+        callbacksRef.current.onVisitorJoined?.(message)
+        
+        // Show notification for new conversations
+        if (enableNotifications && message.conversation_id && message.is_new_conversation) {
+          const visitorName = message.visitor_name || `Visitor ${message.visitor_id?.slice(-4) || 'Unknown'}`
+          const websiteName = message.website_name || 'Website'
+          
+          notifications.showNewConversation(
+            message.conversation_id,
+            visitorName,
+            websiteName
+          )
+        }
+        
+        // Show visitor activity notification if enabled
+        if (enableNotifications && message.visitor_count && message.website_name) {
+          notifications.showVisitorActivity(message.website_name, message.visitor_count)
+        }
         break
         
       case 'error':
@@ -105,7 +234,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
       default:
         console.log('Unknown message type:', message.type, message)
     }
-  }, [userId, onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined])
+  }, [userId, enableNotifications, currentConversationId, notifications])
 
   const handleConnect = useCallback(() => {
     console.log('WebSocket connected')
@@ -127,16 +256,38 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
 
   const handleError = useCallback((error: Event) => {
     console.error('WebSocket error:', error)
-    setConnectionError('Connection error occurred')
-  }, [])
+    
+    // Check if this might be a token expiration issue
+    const wsTarget = error.target as WebSocket
+    if (wsTarget && wsTarget.readyState === WebSocket.CLOSED) {
+      console.warn('WebSocket immediately closed - possible authentication issue')
+      console.warn('WebSocket URL:', wsTarget.url)
+      
+      // Log connection debugging info
+      console.group('WebSocket Connection Debug')
+      console.log('URL:', wsTarget.url)
+      console.log('ReadyState:', wsTarget.readyState)
+      console.log('UserId:', userId)
+      console.log('Token Valid:', isTokenValid)
+      if (token) {
+        isTokenExpired(token) // This will log token debug info
+      }
+      console.groupEnd()
+      
+      setConnectionError('Connection failed - check authentication')
+    } else {
+      setConnectionError('Connection error occurred')
+    }
+  }, [userId, token, isTokenValid])
 
   const { isConnected, send, disconnect, reconnect, connectionState } = useWebSocket(wsUrl, {
     onMessage: handleMessage,
     onConnect: handleConnect,
     onDisconnect: handleDisconnect,
     onError: handleError,
-    reconnectInterval: 3000,
-    maxReconnectAttempts: 5
+    reconnectInterval: 3000, // Faster initial reconnect
+    maxReconnectAttempts: 5, // More attempts for better resilience
+    enabled: enabled && !!userId && !!token
   })
 
   // Join/leave conversation when conversationId changes
@@ -159,10 +310,10 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
   const sendMessage = useCallback((content: string, metadata?: any) => {
     if (!conversationId) {
       console.warn('Cannot send message: no conversation ID')
-      return
+      return false
     }
     
-    send({
+    return send({
       type: 'send_message',
       conversation_id: conversationId,
       content,

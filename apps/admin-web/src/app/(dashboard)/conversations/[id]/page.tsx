@@ -6,6 +6,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Textarea } fro
 import { ArrowLeft, Send, User, Globe, Clock, CheckCircle, AlertCircle, Phone, Mail, MapPin, Wifi, WifiOff } from 'lucide-react'
 import Link from 'next/link'
 import { useConversationWebSocket } from '@/hooks/useConversationWebSocket'
+import { API_BASE_URL } from '@/config/api'
 
 interface Message {
   id: string
@@ -49,33 +50,92 @@ export default function ConversationDetailPage() {
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [messagesSentViaSocket, setMessagesSentViaSocket] = useState<Set<string>>(new Set())
+  const [serverError, setServerError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // Get real user data from localStorage
-  const currentUser = (() => {
-    if (typeof window === 'undefined') return { id: '', token: '' }
-    
-    const token = localStorage.getItem('accessToken') || ''
-    const userData = localStorage.getItem('user')
-    const user = userData ? JSON.parse(userData) : { id: '' }
-    
-    return {
-      id: user.id || '',
-      token: token
+  // Get real user data from localStorage (client-side only)
+  const [currentUser, setCurrentUser] = useState({ id: '', token: '' })
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('accessToken') || ''
+      const userData = localStorage.getItem('user')
+      const user = userData ? JSON.parse(userData) : { id: '' }
+      
+      console.log('🔐 Setting up user authentication for WebSocket:', {
+        hasToken: !!token,
+        tokenLength: token.length,
+        userId: user.id || 'none',
+        userName: user.name || 'none'
+      })
+      
+      setCurrentUser({
+        id: user.id || '',
+        token: token
+      })
     }
-  })()
+  }, [])
 
-  // Disable WebSocket for now to improve performance
-  const isConnected = false
-  const connectionError = null
-  const typingUsers = []
-  const sendWebSocketMessage = () => {}
-  const startTyping = () => {}
-  const stopTyping = () => {}
+  // Memoized callback for new messages to ensure stability across re-renders
+  const handleNewMessage = useCallback((message: any) => {
+    const newMsg: Message = {
+      id: message.id,
+      content: message.content,
+      sender: message.sender,
+      timestamp: message.timestamp,
+      type: 'text'
+    }
+    
+    // Always update conversation state, even if conversation is not loaded yet
+    setConversation(prev => {
+      if (!prev) {
+        // Create a minimal conversation structure to hold the message
+        return {
+          id: conversationId,
+          website_name: 'Loading...',
+          website_domain: 'unknown.com',
+          visitor: {
+            name: 'Unknown Visitor',
+            email: undefined,
+            phone: undefined,
+            location: undefined,
+            userAgent: undefined,
+            referrer: undefined,
+            visitCount: 1,
+            firstVisit: new Date().toISOString(),
+            currentPage: '/'
+          },
+          status: 'active' as const,
+          priority: 'normal' as const,
+          assignedAgent: 'You',
+          tags: [],
+          created_at: new Date().toISOString(),
+          messages: [newMsg]
+        }
+      }
+      
+      // Check for duplicate messages
+      const messageExists = prev.messages.some(msg => 
+        msg.id === newMsg.id || 
+        (msg.content === newMsg.content && 
+         msg.sender === newMsg.sender && 
+         Math.abs(new Date(msg.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000)
+      )
+      
+      if (messageExists) {
+        return prev
+      }
+      
+      return {
+        ...prev,
+        messages: [...prev.messages, newMsg]
+      }
+    })
+  }, [conversationId])
 
-  // WebSocket connection for real-time updates - DISABLED
-  /*
+  // WebSocket connection for real-time updates
   const {
     isConnected,
     connectionError,
@@ -87,21 +147,10 @@ export default function ConversationDetailPage() {
     userId: currentUser.id,
     token: currentUser.token,
     conversationId,
-    onNewMessage: (message) => {
-      if (conversation) {
-        const newMsg: Message = {
-          id: message.id,
-          content: message.content,
-          sender: message.sender,
-          timestamp: message.timestamp,
-          type: 'text'
-        }
-        setConversation(prev => prev ? {
-          ...prev,
-          messages: [...prev.messages, newMsg]
-        } : null)
-      }
-    },
+    enableNotifications: false, // Disable notifications in conversation view since user is actively viewing
+    currentConversationId: conversationId, // Mark this as the currently viewed conversation
+    enabled: !!currentUser.id && !!currentUser.token, // Only enable WebSocket when user data is available
+    onNewMessage: handleNewMessage,
     onTypingStart: (typing) => {
       console.log('User started typing:', typing)
     },
@@ -109,7 +158,7 @@ export default function ConversationDetailPage() {
       console.log('User stopped typing:', typing)
     }
   })
-  */
+
 
   // Mock data loading - DISABLED
   useEffect(() => {
@@ -192,7 +241,7 @@ export default function ConversationDetailPage() {
           return
         }
 
-        const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -205,8 +254,8 @@ export default function ConversationDetailPage() {
           // Transform API response to frontend format
           const transformedConversation: Conversation = {
             id: data.id,
-            website_name: data.website_name,
-            website_domain: data.website_domain,
+            website_name: data.website_name || 'Unknown Website',
+            website_domain: data.website_domain || 'unknown.com',
             visitor: {
               name: data.visitor_name || 'Anonymous User',
               email: data.visitor_email,
@@ -218,12 +267,12 @@ export default function ConversationDetailPage() {
               firstVisit: data.created_at,
               currentPage: '/'
             },
-            status: data.status as 'active' | 'waiting' | 'resolved',
+            status: (data.status as 'active' | 'waiting' | 'resolved') || 'active',
             priority: 'normal',
             assignedAgent: 'You',
             tags: [],
             created_at: data.created_at,
-            messages: data.messages.map((msg: any) => ({
+            messages: (data.messages || []).map((msg: any) => ({
               id: msg.id,
               content: msg.content,
               sender: msg.sender as 'visitor' | 'agent',
@@ -233,18 +282,73 @@ export default function ConversationDetailPage() {
           }
           
           setConversation(transformedConversation)
+        } else if (response.status === 404) {
+          console.error('Conversation not found')
+          setConversation(null)
+        } else if (response.status === 500) {
+          console.error('Server error loading conversation')
+          setServerError('Server error loading conversation. Some features may not work properly.')
+          // Create a fallback conversation object for better UX
+          const fallbackConversation: Conversation = {
+            id: conversationId,
+            website_name: 'Website',
+            website_domain: 'unknown.com',
+            visitor: {
+              name: 'Unknown Visitor',
+              email: undefined,
+              phone: undefined,
+              location: undefined,
+              userAgent: undefined,
+              referrer: undefined,
+              visitCount: 1,
+              firstVisit: new Date().toISOString(),
+              currentPage: '/'
+            },
+            status: 'active',
+            priority: 'normal',
+            assignedAgent: 'You',
+            tags: [],
+            created_at: new Date().toISOString(),
+            messages: []
+          }
+          setConversation(fallbackConversation)
         } else {
-          console.error('Failed to fetch conversation:', response.status)
+          console.error('Failed to fetch conversation:', response.status, await response.text())
         }
       } catch (error) {
         console.error('Error loading conversation:', error)
+        setServerError('Network error loading conversation. Using offline mode.')
+        // Show fallback conversation for network errors
+        const fallbackConversation: Conversation = {
+          id: conversationId,
+          website_name: 'Website',
+          website_domain: 'unknown.com',
+          visitor: {
+            name: 'Unknown Visitor',
+            email: undefined,
+            phone: undefined,
+            location: undefined,
+            userAgent: undefined,
+            referrer: undefined,
+            visitCount: 1,
+            firstVisit: new Date().toISOString(),
+            currentPage: '/'
+          },
+          status: 'active',
+          priority: 'normal',
+          assignedAgent: 'You',
+          tags: [],
+          created_at: new Date().toISOString(),
+          messages: []
+        }
+        setConversation(fallbackConversation)
       } finally {
         setLoading(false)
       }
     }
 
     loadConversation()
-  }, []) // Only run once on mount
+  }, [conversationId]) // Include conversationId as dependency
 
   useEffect(() => {
     scrollToBottom()
@@ -258,54 +362,108 @@ export default function ConversationDetailPage() {
     if (!newMessage.trim() || sending) return
 
     setSending(true)
+    const messageContent = newMessage
+    const tempId = 'temp-' + Date.now()
     
     try {
-      // Add message to local UI first for immediate feedback
-      const localMessage: Message = {
-        id: 'msg-' + Date.now(),
-        content: newMessage,
+      // Create temporary message for immediate UI feedback
+      const tempMessage: Message = {
+        id: tempId,
+        content: messageContent,
         sender: 'agent',
         timestamp: new Date().toISOString(),
         type: 'text'
       }
       
+      // Add temp message to UI
       if (conversation) {
-        setConversation({
-          ...conversation,
-          messages: [...conversation.messages, localMessage]
-        })
+        setConversation(prev => prev ? {
+          ...prev,
+          messages: [...prev.messages, tempMessage]
+        } : null)
       }
       
-      // Try to send to backend API in background
+      // Clear input immediately for better UX
+      setNewMessage('')
+      stopTyping()
+      
       try {
-        const token = currentUser.token
-        if (token) {
-          const response = await fetch(`http://localhost:8000/api/v1/conversations/${conversationId}/messages`, {
+        if (isConnected) {
+          // Send via WebSocket
+          const sent = sendWebSocketMessage(messageContent)
+          
+          if (sent) {
+            console.log('Message sent via WebSocket')
+            
+            // Track that this message was sent via socket
+            setMessagesSentViaSocket(prev => new Set(prev).add(tempId))
+            
+            // Remove temp message - the real one will come via WebSocket
+            setTimeout(() => {
+              setConversation(prev => prev ? {
+                ...prev,
+                messages: prev.messages.filter(msg => msg.id !== tempId)
+              } : null)
+            }, 100)
+          } else {
+            throw new Error('WebSocket send failed')
+          }
+          
+        } else {
+          // Send via REST API
+          const token = currentUser.token
+          if (!token) throw new Error('No authentication token')
+          
+          const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}/messages`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              content: newMessage,
+              content: messageContent,
               sender: 'agent'
             })
           })
           
           if (response.ok) {
-            console.log('Message sent to backend successfully')
+            const savedMessage = await response.json()
+            console.log('Message sent via REST API successfully')
+            
+            // Replace temp message with real message from API
+            setConversation(prev => prev ? {
+              ...prev,
+              messages: prev.messages.map(msg => 
+                msg.id === tempId ? {
+                  ...msg,
+                  id: savedMessage.id || savedMessage.message?.id || tempId,
+                  timestamp: savedMessage.timestamp || savedMessage.message?.timestamp || msg.timestamp
+                } : msg
+              )
+            } : null)
           } else {
-            console.error('Failed to send to backend:', response.status, await response.text())
+            throw new Error(`API request failed: ${response.status}`)
           }
         }
-      } catch (apiError) {
-        console.error('API call failed:', apiError)
+      } catch (sendError) {
+        console.error('Failed to send message:', sendError)
+        
+        // Remove temp message and show error
+        setConversation(prev => prev ? {
+          ...prev,
+          messages: prev.messages.filter(msg => msg.id !== tempId)
+        } : null)
+        
+        // Restore message to input
+        setNewMessage(messageContent)
+        
+        // Could show an error notification here
+        alert('Failed to send message. Please try again.')
       }
       
-      setNewMessage('')
-      stopTyping()
     } catch (error) {
-      console.error('Failed to send message:', error)
+      console.error('Failed to prepare message:', error)
+      setNewMessage(messageContent) // Restore message
     } finally {
       setSending(false)
     }
@@ -405,6 +563,16 @@ export default function ConversationDetailPage() {
 
   return (
     <div className="p-8">
+      {/* Server Error Banner */}
+      {serverError && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center">
+            <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
+            <span className="text-sm text-orange-700">{serverError}</span>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
@@ -468,12 +636,12 @@ export default function ConversationDetailPage() {
                     {isConnected ? (
                       <div className="flex items-center space-x-1 text-green-600">
                         <Wifi className="w-4 h-4" />
-                        <span className="text-xs">Live</span>
+                        <span className="text-xs">Live WebSocket</span>
                       </div>
                     ) : (
-                      <div className="flex items-center space-x-1 text-gray-400">
+                      <div className="flex items-center space-x-1 text-orange-500">
                         <WifiOff className="w-4 h-4" />
-                        <span className="text-xs">Offline</span>
+                        <span className="text-xs">REST API Mode</span>
                       </div>
                     )}
                   </div>

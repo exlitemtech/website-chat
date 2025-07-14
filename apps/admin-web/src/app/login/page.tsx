@@ -61,11 +61,11 @@ export default function LoginPage() {
           <CardTitle className="text-3xl font-bold text-slate-900">Welcome Back</CardTitle>
           <CardDescription className="text-slate-500 mt-2">
             Sign in to your admin dashboard
-            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-700 font-medium">Demo Account</p>
-              <p className="text-xs text-blue-600">admin@example.com • password123</p>
-            </div>
           </CardDescription>
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-sm text-blue-700 font-medium">Demo Account</p>
+            <p className="text-xs text-blue-600">admin@example.com • password123</p>
+          </div>
         </CardHeader>
         
         <form onSubmit={handleSubmit}>

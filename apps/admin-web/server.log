@@ -53,3 +53,14 @@
 ::1 - - [12/Jul/2025 21:19:38] "GET /test-website/ HTTP/1.1" 304 -
 ::1 - - [12/Jul/2025 21:20:14] "GET /test-website/ HTTP/1.1" 304 -
 ::1 - - [12/Jul/2025 21:21:28] "GET /test-website/ HTTP/1.1" 200 -
+::1 - - [12/Jul/2025 22:13:07] "GET /test-website/ HTTP/1.1" 200 -
+::1 - - [12/Jul/2025 22:13:07] "GET /apps/chat-widget/dist/website-chat-widget.css HTTP/1.1" 200 -
+::1 - - [12/Jul/2025 22:13:07] "GET /apps/chat-widget/dist/website-chat-widget.iife.js HTTP/1.1" 200 -
+::1 - - [12/Jul/2025 22:13:07] code 404, message File not found
+::1 - - [12/Jul/2025 22:13:07] "GET /favicon.ico HTTP/1.1" 404 -
+::1 - - [12/Jul/2025 22:13:08] "GET /test-website/ HTTP/1.1" 304 -
+::1 - - [12/Jul/2025 22:13:13] code 404, message File not found
+::1 - - [12/Jul/2025 22:13:13] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+::1 - - [12/Jul/2025 22:13:27] "GET /test-website/ HTTP/1.1" 304 -
+::1 - - [12/Jul/2025 22:13:27] code 404, message File not found
+::1 - - [12/Jul/2025 22:13:27] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -

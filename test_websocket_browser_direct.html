@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Browser Test</title>
+</head>
+<body>
+    <h1>Direct WebSocket Browser Test</h1>
+    <div id="output"></div>
+    <button onclick="testWebSocket()">Test WebSocket Connection</button>
+    
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += `<div>${new Date().toISOString()}: ${message}</div>`;
+            console.log(message);
+        }
+        
+        async function testWebSocket() {
+            log('🧪 Starting direct WebSocket test...');
+            
+            // First, get authentication token
+            try {
+                log('📡 Logging in to get token...');
+                const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const loginData = await loginResponse.json();
+                if (!loginData.accessToken) {
+                    log('❌ Login failed');
+                    return;
+                }
+                
+                log('✅ Login successful');
+                
+                // Test WebSocket connection
+                const userId = loginData.user.id;
+                const token = loginData.accessToken;
+                
+                // Try both localhost and IP
+                const urls = [
+                    `ws://127.0.0.1:8000/ws/agent/${userId}?token=${encodeURIComponent(token)}`,
+                    `ws://localhost:8000/ws/agent/${userId}?token=${encodeURIComponent(token)}`
+                ];
+                
+                for (const url of urls) {
+                    log(`🔌 Testing WebSocket: ${url.substring(0, 50)}...`);
+                    
+                    try {
+                        const ws = new WebSocket(url);
+                        
+                        ws.onopen = function() {
+                            log('✅ WebSocket connected successfully!');
+                            log('🎉 REAL-TIME MESSAGING SHOULD WORK NOW!');
+                            ws.close();
+                        };
+                        
+                        ws.onerror = function(error) {
+                            log(`❌ WebSocket error: ${error}`);
+                        };
+                        
+                        ws.onclose = function(event) {
+                            log(`🔌 WebSocket closed: code=${event.code}, reason=${event.reason}`);
+                        };
+                        
+                        // Wait 5 seconds for connection
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        
+                    } catch (error) {
+                        log(`❌ WebSocket creation failed: ${error.message}`);
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Login failed: ${error.message}`);
+            }
+        }
+        
+        // Auto-run test
+        window.onload = () => {
+            setTimeout(testWebSocket, 1000);
+        };
+    </script>
+</body>
+</html>

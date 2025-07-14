@@ -40,21 +40,20 @@ def get_current_user(
 
 async def get_current_user_websocket(token: str, db: Session) -> User:
     """Authenticate user for WebSocket connections"""
+    print(f"WebSocket authentication: token={token[:20]}...")
     user_id = verify_token(token)
+    print(f"WebSocket authentication: user_id={user_id}")
     
     if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
-        )
+        print("WebSocket authentication failed: Invalid token")
+        return None
     
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
+        print(f"WebSocket authentication failed: User not found for id={user_id}")
+        return None
     
+    print(f"WebSocket authentication successful: user={user.email}")
     return user
 
 @router.post("/login", response_model=LoginResponse)

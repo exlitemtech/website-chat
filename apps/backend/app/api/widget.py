@@ -10,6 +10,7 @@ from app.db.database import get_db
 from app.models.website import Website
 from app.models.visitor import Visitor
 from app.models.conversation import Conversation, Message, MessageType
+from app.websockets.connection_manager import connection_manager
 
 router = APIRouter()
 
@@ -93,6 +94,29 @@ async def send_widget_message(
         db.add(message)
         
         db.commit()
+        
+        # Broadcast the message to connected agents via WebSocket
+        try:
+            message_data = {
+                "id": message.id,
+                "content": message.content,
+                "sender": message.sender,
+                "sender_id": message.sender_id,
+                "timestamp": message.created_at.isoformat(),
+                "conversation_id": conversation.id,
+                "type": "text"
+            }
+            
+            print(f"📡 Widget API: Broadcasting message to conversation {conversation.id}")
+            await connection_manager.broadcast_to_conversation({
+                "type": "new_message",
+                "message": message_data
+            }, conversation.id)
+            print(f"📡 Widget API: Message broadcast completed")
+            
+        except Exception as broadcast_error:
+            print(f"❌ Widget API: Failed to broadcast message: {broadcast_error}")
+            # Don't fail the API request if broadcasting fails
         
         # Return response in expected format
         return WidgetMessageResponse(

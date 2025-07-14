@@ -1,5 +1,6 @@
 import json
 import uuid
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -23,34 +24,51 @@ async def websocket_agent_endpoint(
 ):
     """WebSocket endpoint for agents/admin users"""
     
-    # Authenticate user
+    # Accept connection first, then authenticate (FastAPI WebSocket pattern)
     try:
-        user = await get_current_user_websocket(token, db)
-        if not user or str(user.id) != user_id:
-            await websocket.close(code=4001, reason="Unauthorized")
-            return
+        await websocket.accept()
+        print(f"WebSocket connection accepted, now authenticating user {user_id}")
     except Exception as e:
-        await websocket.close(code=4001, reason="Authentication failed")
+        print(f"Failed to accept WebSocket connection: {e}")
         return
+    
+    # Authenticate user after accepting connection
+    print(f"WebSocket authentication attempt for user {user_id}")
+    user = await get_current_user_websocket(token, db)
+    if not user or str(user.id) != user_id:
+        print(f"Authentication failed: user={user}, user_id={user_id}")
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+    print(f"WebSocket authentication successful for user {user_id}")
     
     connection_id = str(uuid.uuid4())
     
     try:
-        # Connect to WebSocket
+        print(f"Attempting to connect WebSocket for agent {user_id}")
+        # Connect to WebSocket (connection manager will handle accept())
         await connection_manager.connect(
             websocket=websocket,
             connection_id=connection_id,
             user_id=user_id,
             connection_type="agent"
         )
+        print(f"WebSocket connected successfully for agent {user_id}")
         
-        # Send connection confirmation
-        await connection_manager.send_personal_message({
-            "type": "connection_established",
-            "connection_id": connection_id,
-            "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
-        }, connection_id)
+        # Send connection confirmation immediately (no delay needed)
+        try:
+            await connection_manager.send_personal_message({
+                "type": "connection_established",
+                "connection_id": connection_id,
+                "user_id": user_id,
+                "timestamp": datetime.utcnow().isoformat()
+            }, connection_id)
+            print(f"✅ Sent connection confirmation to {connection_id}")
+        except WebSocketDisconnect:
+            print(f"🔌 Client disconnected before confirmation could be sent to {connection_id}")
+            return  # Exit early if client already disconnected
+        except Exception as e:
+            print(f"❌ Failed to send connection confirmation: {e}")
+            # Don't close connection just because initial message failed
         
         # Handle incoming messages
         while True:
@@ -75,6 +93,12 @@ async def websocket_agent_endpoint(
                 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        print(f"WebSocket error for agent {user_id}: {e}")
+        try:
+            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except:
+            pass
     finally:
         connection_manager.disconnect(connection_id)
 
@@ -87,7 +111,15 @@ async def websocket_visitor_endpoint(
 ):
     """WebSocket endpoint for website visitors"""
     
-    # Verify website exists
+    # Accept connection first
+    try:
+        await websocket.accept()
+        print(f"WebSocket connection accepted for visitor")
+    except Exception as e:
+        print(f"Failed to accept WebSocket connection: {e}")
+        return
+    
+    # Verify website exists after accepting connection
     website = db.query(Website).filter(Website.id == website_id).first()
     if not website:
         await websocket.close(code=4004, reason="Website not found")
@@ -100,7 +132,7 @@ async def websocket_visitor_endpoint(
     connection_id = str(uuid.uuid4())
     
     try:
-        # Connect to WebSocket
+        # Register WebSocket connection
         await connection_manager.connect(
             websocket=websocket,
             connection_id=connection_id,
@@ -109,6 +141,9 @@ async def websocket_visitor_endpoint(
             website_id=website_id,
             visitor_id=visitor_id
         )
+        
+        # Give WebSocket a moment to be ready before sending initial message
+        await asyncio.sleep(0.1)
         
         # Send connection confirmation
         await connection_manager.send_personal_message({
@@ -142,6 +177,12 @@ async def websocket_visitor_endpoint(
                 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        print(f"WebSocket error for visitor {visitor_id}: {e}")
+        try:
+            await websocket.close(code=4000, reason=f"Connection error: {str(e)}")
+        except:
+            pass
     finally:
         connection_manager.disconnect(connection_id)
 
@@ -149,11 +190,29 @@ async def handle_agent_message(message_data: dict, connection_id: str, user_id: 
     """Handle messages from agents"""
     message_type = message_data.get("type")
     
-    if message_type == "join_conversation":
+    if message_type == "ping":
+        # Respond to heartbeat ping
+        await connection_manager.send_personal_message({
+            "type": "pong",
+            "timestamp": datetime.utcnow().isoformat()
+        }, connection_id)
+        return
+    
+    elif message_type == "join_conversation":
         conversation_id = message_data.get("conversation_id")
         if conversation_id:
+            print(f"🔔 Agent {user_id} joining conversation {conversation_id}")
             # Subscribe to conversation updates
             connection_manager.subscribe_to_conversation(connection_id, conversation_id)
+            
+            # Send confirmation to the joining agent
+            await connection_manager.send_personal_message({
+                "type": "agent_joined",
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": "Successfully joined conversation"
+            }, connection_id)
             
             # Notify other participants
             await connection_manager.broadcast_to_conversation({
@@ -162,6 +221,9 @@ async def handle_agent_message(message_data: dict, connection_id: str, user_id: 
                 "conversation_id": conversation_id,
                 "timestamp": datetime.utcnow().isoformat()
             }, conversation_id, exclude_connection=connection_id)
+            print(f"✅ Agent {user_id} successfully joined conversation {conversation_id}")
+        else:
+            print(f"❌ No conversation_id provided for join_conversation message")
     
     elif message_type == "leave_conversation":
         conversation_id = message_data.get("conversation_id")
@@ -206,7 +268,15 @@ async def handle_visitor_message(message_data: dict, connection_id: str, visitor
     """Handle messages from visitors"""
     message_type = message_data.get("type")
     
-    if message_type == "join_conversation":
+    if message_type == "ping":
+        # Respond to heartbeat ping
+        await connection_manager.send_personal_message({
+            "type": "pong",
+            "timestamp": datetime.utcnow().isoformat()
+        }, connection_id)
+        return
+    
+    elif message_type == "join_conversation":
         conversation_id = message_data.get("conversation_id")
         if conversation_id:
             connection_manager.subscribe_to_conversation(connection_id, conversation_id)
@@ -297,10 +367,12 @@ async def handle_send_message(message_data: dict, connection_id: str, sender_id:
             }
         }
         
+        print(f"📢 Broadcasting message to conversation {conversation_id}: {content[:50]}...")
         await connection_manager.broadcast_to_conversation(
             broadcast_message, 
             conversation_id
         )
+        print(f"✅ Message broadcast completed for conversation {conversation_id}")
         
     except Exception as e:
         await connection_manager.send_personal_message({

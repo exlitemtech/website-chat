@@ -111,14 +111,35 @@ export class ChatWidget {
         break
         
       case 'new_message':
+        console.log('🔔 Widget received new_message via WebSocket:', message.message)
         if (message.message) {
-          this.addMessage({
+          const incomingMessage = {
             id: message.message.id,
             content: message.message.content,
             sender: message.message.sender,
             timestamp: new Date(message.message.timestamp),
             type: 'text'
-          })
+          }
+          
+          // If this is a visitor message with the same content as a temporary message,
+          // replace the temporary message instead of adding a duplicate
+          if (message.message.sender === 'visitor') {
+            const tempMessage = this.messages.find(m => 
+              m.id.startsWith('temp-') && 
+              m.content === message.message.content &&
+              m.sender === 'visitor'
+            )
+            
+            if (tempMessage) {
+              console.log('🔄 Replacing temporary message with real WebSocket message')
+              this.replaceTemporaryMessage(tempMessage.id, message.message)
+              return
+            }
+          }
+          
+          // Otherwise, add the message normally (for agent messages or messages from other sessions)
+          console.log('🔔 Widget adding message to UI:', message.message)
+          this.addMessage(incomingMessage)
         }
         break
         
@@ -344,9 +365,12 @@ export class ChatWidget {
     const content = this.messageInput.value.trim()
     if (!content) return
     
-    // Add user message immediately
+    // Generate a temporary ID for the optimistic UI update
+    const tempId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+    
+    // Add user message immediately for optimistic UI
     const userMessage: Message = {
-      id: 'msg-' + Date.now(),
+      id: tempId,
       content,
       sender: 'visitor',
       timestamp: new Date(),
@@ -379,21 +403,30 @@ export class ChatWidget {
             }
           }
           
+          // Replace the temporary message with the real one from backend
+          this.replaceTemporaryMessage(tempId, response.message)
+          
           // Hide typing and add agent response (only for fallback)
           this.hideTypingIndicator()
-          // Don't add the echo message from API - only add agent responses
-          if (response.message.sender === 'agent') {
-            this.addMessage(response.message)
-          }
+          // Don't add the echo message from API - it's already replaced above
         }
       }
     } catch (error) {
       console.error('Failed to send message:', error)
       this.hideTypingIndicator()
+      // Optionally mark the temporary message as failed
+      this.markMessageAsFailed(tempId)
     }
   }
 
   private addMessage(message: Message, isNew = true): void {
+    // Check for duplicate messages to prevent the same message appearing twice
+    const existingMessage = this.messages.find(m => m.id === message.id)
+    if (existingMessage) {
+      console.log('🚫 Duplicate message detected, skipping:', message.id)
+      return
+    }
+    
     this.messages.push(message)
     
     const messageElement = this.createMessageElement(message)
@@ -413,6 +446,44 @@ export class ChatWidget {
     if (isNew && !this.isOpen && message.sender === 'agent') {
       this.unreadCount++
       this.updateNotificationBadge()
+    }
+  }
+
+  private replaceTemporaryMessage(tempId: string, realMessage: any): void {
+    // Find and replace temporary message with real message from backend
+    const messageIndex = this.messages.findIndex(m => m.id === tempId)
+    if (messageIndex !== -1) {
+      // Update the message data
+      this.messages[messageIndex] = {
+        id: realMessage.id,
+        content: realMessage.content,
+        sender: realMessage.sender,
+        timestamp: new Date(realMessage.timestamp),
+        type: 'text'
+      }
+      
+      // Update the DOM element
+      const messageElements = this.messagesContainer.querySelectorAll('.wc-message')
+      if (messageElements[messageIndex]) {
+        const newElement = this.createMessageElement(this.messages[messageIndex])
+        messageElements[messageIndex].replaceWith(newElement)
+      }
+      
+      console.log('✅ Replaced temporary message', tempId, 'with real message', realMessage.id)
+    }
+  }
+
+  private markMessageAsFailed(messageId: string): void {
+    // Find message and mark as failed
+    const messageIndex = this.messages.findIndex(m => m.id === messageId)
+    if (messageIndex !== -1) {
+      // Add a visual indicator for failed message
+      const messageElements = this.messagesContainer.querySelectorAll('.wc-message')
+      if (messageElements[messageIndex]) {
+        messageElements[messageIndex].classList.add('failed')
+        // Could add retry functionality here in the future
+      }
+      console.log('❌ Marked message as failed:', messageId)
     }
   }
 
@@ -515,6 +586,12 @@ export class ChatWidget {
         const conversationId = this.apiClient.getConversationId()
         if (conversationId) {
           this.conversationId = conversationId
+          
+          // Join the conversation via WebSocket if connected
+          if (this.websocket?.isConnected()) {
+            console.log('🔌 Joining conversation after loading history:', conversationId)
+            this.websocket.joinConversation(conversationId)
+          }
         }
       }
     } catch (error) {

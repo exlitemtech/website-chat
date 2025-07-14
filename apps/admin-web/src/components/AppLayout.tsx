@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useNotifications } from '@/hooks/useNotifications'
+import { useConversationWebSocket } from '@/hooks/useConversationWebSocket'
+import NotificationSettings from '@/components/NotificationSettings'
 import { 
   Layout, 
   LayoutHeader, 
@@ -26,7 +29,10 @@ import {
   Settings, 
   LogOut,
   Bell,
-  Search
+  BellOff,
+  Search,
+  Volume2,
+  VolumeX
 } from 'lucide-react'
 
 interface User {
@@ -46,12 +52,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false)
+  const [isConversationView, setIsConversationView] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  
+  const notifications = useNotifications()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+  
+  // Track if we're in conversation view
+  useEffect(() => {
+    if (mounted) {
+      setIsConversationView(pathname.includes('/conversations/') && pathname.split('/').length > 3)
+    }
+  }, [mounted, pathname])
 
   useEffect(() => {
     if (!mounted) return
@@ -75,6 +92,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
     setIsLoading(false)
   }, [mounted, router])
 
+  // Initialize WebSocket connection for global notifications (client-side only)
+  const { isConnected } = useConversationWebSocket({
+    userId: mounted && user?.id ? user.id : '',
+    token: mounted && typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '',
+    enableNotifications: true,
+    currentConversationId: isConversationView ? pathname.split('/').pop() : undefined,
+    enabled: mounted && !!user?.id && !isConversationView // Disable when viewing specific conversation to prevent duplicate connections
+  })
+
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken')
@@ -82,6 +108,30 @@ export default function AppLayout({ children }: AppLayoutProps) {
       localStorage.removeItem('user')
     }
     router.push('/login')
+  }
+
+  const handleNotificationToggle = async () => {
+    if (!notifications.permission.isGranted) {
+      await notifications.requestPermission()
+    } else {
+      notifications.updatePreferences({ 
+        enabled: !notifications.preferences.enabled 
+      })
+    }
+  }
+
+  const handleSoundToggle = () => {
+    notifications.updatePreferences({ 
+      soundEnabled: !notifications.preferences.soundEnabled 
+    })
+  }
+
+  const handleDoNotDisturbToggle = () => {
+    if (notifications.preferences.doNotDisturb) {
+      notifications.disableDoNotDisturb()
+    } else {
+      notifications.enableDoNotDisturb()
+    }
   }
 
   const navigation = [
@@ -181,10 +231,57 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <Button variant="ghost" size="icon" className="relative">
               <Search className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
-            </Button>
+            
+            {/* Notification Controls */}
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleNotificationToggle}
+                className={`relative transition-colors ${
+                  notifications.preferences.enabled && notifications.permission.isGranted
+                    ? 'text-green-600 hover:text-green-700' 
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title={notifications.permission.isGranted 
+                  ? (notifications.preferences.enabled ? 'Disable notifications' : 'Enable notifications')
+                  : 'Request notification permission'
+                }
+              >
+                {notifications.preferences.doNotDisturb ? (
+                  <BellOff className="h-4 w-4" />
+                ) : (
+                  <Bell className="h-4 w-4" />
+                )}
+                {!isConnected && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 bg-orange-500 rounded-full"></span>
+                )}
+                {isConnected && notifications.preferences.enabled && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full"></span>
+                )}
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleSoundToggle}
+                className={`transition-colors ${
+                  notifications.preferences.soundEnabled
+                    ? 'text-blue-600 hover:text-blue-700' 
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+                title={notifications.preferences.soundEnabled ? 'Disable sound' : 'Enable sound'}
+              >
+                {notifications.preferences.soundEnabled ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4" />
+                )}
+              </Button>
+              
+              <NotificationSettings />
+            </div>
+            
             <div className="h-6 w-px bg-slate-200 mx-2"></div>
             <Avatar className="h-9 w-9 ring-2 ring-indigo-100">
               <AvatarImage src={user?.avatar} />
