@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useWebSocket } from './useWebSocket'
 import { useNotifications } from './useNotifications'
 import { API_ENDPOINTS } from '@/config/api'
@@ -82,10 +82,21 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
   // Check token expiration before creating WebSocket URL
   const isTokenValid = token && !isTokenExpired(token)
   
-  // Construct WebSocket URL using config only if token is valid
-  const wsUrl = userId && token && isTokenValid
-    ? API_ENDPOINTS.wsAgent(userId, token)
-    : null
+  // Memoize WebSocket URL to prevent unnecessary reconnections
+  const wsUrl = useMemo(() => {
+    if (userId && token && isTokenValid) {
+      const url = API_ENDPOINTS.wsAgent(userId, token)
+      console.log('🔗 WebSocket URL created:', url.substring(0, 100) + '...')
+      return url
+    }
+    console.log('🔗 WebSocket URL not created - missing requirements:', {
+      hasUserId: !!userId,
+      hasToken: !!token,
+      isTokenValid,
+      tokenLength: token?.length || 0
+    })
+    return null
+  }, [userId, token, isTokenValid])
     
   // Debug WebSocket URL construction
   useEffect(() => {
@@ -116,7 +127,9 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
         break
         
       case 'new_message':
+        console.log('🔔 Received new_message via WebSocket:', message.message)
         if (message.message) {
+          console.log('🔔 Calling onNewMessage callback with:', message.message)
           onNewMessage?.(message.message)
           
           // Show notification for new messages from visitors
