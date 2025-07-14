@@ -188,8 +188,18 @@ async def handle_agent_message(message_data: dict, connection_id: str, user_id: 
     elif message_type == "join_conversation":
         conversation_id = message_data.get("conversation_id")
         if conversation_id:
+            print(f"🔔 Agent {user_id} joining conversation {conversation_id}")
             # Subscribe to conversation updates
             connection_manager.subscribe_to_conversation(connection_id, conversation_id)
+            
+            # Send confirmation to the joining agent
+            await connection_manager.send_personal_message({
+                "type": "agent_joined",
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "message": "Successfully joined conversation"
+            }, connection_id)
             
             # Notify other participants
             await connection_manager.broadcast_to_conversation({
@@ -198,6 +208,9 @@ async def handle_agent_message(message_data: dict, connection_id: str, user_id: 
                 "conversation_id": conversation_id,
                 "timestamp": datetime.utcnow().isoformat()
             }, conversation_id, exclude_connection=connection_id)
+            print(f"✅ Agent {user_id} successfully joined conversation {conversation_id}")
+        else:
+            print(f"❌ No conversation_id provided for join_conversation message")
     
     elif message_type == "leave_conversation":
         conversation_id = message_data.get("conversation_id")
@@ -341,10 +354,12 @@ async def handle_send_message(message_data: dict, connection_id: str, sender_id:
             }
         }
         
+        print(f"📢 Broadcasting message to conversation {conversation_id}: {content[:50]}...")
         await connection_manager.broadcast_to_conversation(
             broadcast_message, 
             conversation_id
         )
+        print(f"✅ Message broadcast completed for conversation {conversation_id}")
         
     except Exception as e:
         await connection_manager.send_personal_message({
