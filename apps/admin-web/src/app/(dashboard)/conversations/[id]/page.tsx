@@ -64,12 +64,91 @@ export default function ConversationDetailPage() {
       const userData = localStorage.getItem('user')
       const user = userData ? JSON.parse(userData) : { id: '' }
       
+      console.log('🔐 Setting up user authentication for WebSocket:', {
+        hasToken: !!token,
+        tokenLength: token.length,
+        userId: user.id || 'none',
+        userName: user.name || 'none'
+      })
+      
       setCurrentUser({
         id: user.id || '',
         token: token
       })
     }
   }, [])
+
+  // Memoized callback for new messages to ensure stability across re-renders
+  const handleNewMessage = useCallback((message: any) => {
+    console.log('🎯 onNewMessage callback triggered in conversation page:', message)
+    
+    const newMsg: Message = {
+      id: message.id,
+      content: message.content,
+      sender: message.sender,
+      timestamp: message.timestamp,
+      type: 'text'
+    }
+    
+    console.log('🎯 Adding message to conversation:', newMsg)
+    console.log('🎯 Current conversation ID:', conversationId)
+    console.log('🎯 Message conversation ID:', message.conversation_id)
+    
+    // Always update conversation state, even if conversation is not loaded yet
+    setConversation(prev => {
+      console.log('🎯 Previous conversation state:', prev ? 'exists' : 'null')
+      
+      if (!prev) {
+        console.log('⚠️ Conversation not loaded yet, but message received - creating minimal structure')
+        
+        // Create a minimal conversation structure to hold the message
+        return {
+          id: conversationId,
+          website_name: 'Loading...',
+          website_domain: 'unknown.com',
+          visitor: {
+            name: 'Unknown Visitor',
+            email: undefined,
+            phone: undefined,
+            location: undefined,
+            userAgent: undefined,
+            referrer: undefined,
+            visitCount: 1,
+            firstVisit: new Date().toISOString(),
+            currentPage: '/'
+          },
+          status: 'active' as const,
+          priority: 'normal' as const,
+          assignedAgent: 'You',
+          tags: [],
+          created_at: new Date().toISOString(),
+          messages: [newMsg]
+        }
+      }
+      
+      // Check for duplicate messages
+      const messageExists = prev.messages.some(msg => 
+        msg.id === newMsg.id || 
+        (msg.content === newMsg.content && 
+         msg.sender === newMsg.sender && 
+         Math.abs(new Date(msg.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000)
+      )
+      
+      if (messageExists) {
+        console.log('🚫 Message already exists, skipping duplicate:', newMsg.id)
+        return prev
+      }
+      
+      console.log('✅ Adding message to existing conversation - new message count will be:', prev.messages.length + 1)
+      const updatedConversation = {
+        ...prev,
+        messages: [...prev.messages, newMsg]
+      }
+      
+      console.log('✅ Updated conversation state with new message')
+      return updatedConversation
+    })
+  }, [conversationId])
 
   // WebSocket connection for real-time updates
   const {
@@ -86,39 +165,7 @@ export default function ConversationDetailPage() {
     enableNotifications: false, // Disable notifications in conversation view since user is actively viewing
     currentConversationId: conversationId, // Mark this as the currently viewed conversation
     enabled: !!currentUser.id && !!currentUser.token, // Only enable WebSocket when user data is available
-    onNewMessage: (message) => {
-      if (conversation) {
-        const newMsg: Message = {
-          id: message.id,
-          content: message.content,
-          sender: message.sender,
-          timestamp: message.timestamp,
-          type: 'text'
-        }
-        
-        // Avoid duplicate messages - check if message already exists
-        setConversation(prev => {
-          if (!prev) return null
-          
-          const messageExists = prev.messages.some(msg => 
-            msg.id === newMsg.id || 
-            (msg.content === newMsg.content && 
-             msg.sender === newMsg.sender && 
-             Math.abs(new Date(msg.timestamp).getTime() - new Date(newMsg.timestamp).getTime()) < 5000)
-          )
-          
-          if (messageExists) {
-            console.log('Message already exists, skipping duplicate')
-            return prev
-          }
-          
-          return {
-            ...prev,
-            messages: [...prev.messages, newMsg]
-          }
-        })
-      }
-    },
+    onNewMessage: handleNewMessage,
     onTypingStart: (typing) => {
       console.log('User started typing:', typing)
     },
@@ -126,6 +173,18 @@ export default function ConversationDetailPage() {
       console.log('User stopped typing:', typing)
     }
   })
+
+  // Debug: Log WebSocket connection status
+  useEffect(() => {
+    console.log('🔌 WebSocket status:', {
+      isConnected,
+      hasError: !!connectionError,
+      error: connectionError,
+      userId: currentUser.id,
+      hasToken: !!currentUser.token,
+      enabled: !!currentUser.id && !!currentUser.token
+    })
+  }, [isConnected, connectionError, currentUser.id, currentUser.token])
 
   // Mock data loading - DISABLED
   useEffect(() => {
@@ -317,7 +376,17 @@ export default function ConversationDetailPage() {
     loadConversation()
   }, [conversationId]) // Include conversationId as dependency
 
+  // Debug: Log when conversation state changes
   useEffect(() => {
+    console.log('🔄 Conversation state changed:', {
+      exists: !!conversation,
+      messageCount: conversation?.messages?.length || 0,
+      lastMessage: conversation?.messages?.slice(-1)[0]?.content || 'none'
+    })
+  }, [conversation])
+
+  useEffect(() => {
+    console.log('📜 Messages array changed, scrolling to bottom')
     scrollToBottom()
   }, [conversation?.messages])
 
