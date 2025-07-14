@@ -80,7 +80,25 @@ export function useWebSocket(
     isConnecting.current = true
 
     try {
-      console.log('Attempting WebSocket connection to:', url, `(attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`)
+      console.log('🔌 Attempting WebSocket connection to:', url, `(attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`)
+      
+      // Browser environment debugging
+      if (typeof window !== 'undefined') {
+        console.log('🌐 Browser environment details:', {
+          location: window.location.href,
+          protocol: window.location.protocol,
+          hostname: window.location.hostname,
+          port: window.location.port,
+          isSecure: window.location.protocol === 'https:',
+          userAgent: navigator.userAgent.substring(0, 100) + '...'
+        })
+        
+        // Check for potential security restrictions
+        if (window.location.protocol === 'https:' && url.startsWith('ws:')) {
+          console.warn('⚠️ POTENTIAL ISSUE: Trying to connect to WS from HTTPS page (mixed content)')
+        }
+      }
+      
       setConnectionState('connecting')
       
       // Close any existing connection first
@@ -89,13 +107,32 @@ export function useWebSocket(
         websocket.current = null
       }
       
+      console.log('🚀 Creating WebSocket instance...')
       websocket.current = new WebSocket(url)
+      console.log('✅ WebSocket instance created, readyState:', websocket.current.readyState)
       lastUrl.current = url
+
+      // Check for immediate connection issues
+      setTimeout(() => {
+        if (websocket.current) {
+          console.log('🔍 WebSocket state after creation:', {
+            readyState: websocket.current.readyState,
+            url: websocket.current.url,
+            protocol: websocket.current.protocol,
+            extensions: websocket.current.extensions
+          })
+          
+          // If it's already closed/closing immediately after creation, that's the browser blocking it
+          if (websocket.current.readyState === WebSocket.CLOSED || websocket.current.readyState === WebSocket.CLOSING) {
+            console.error('❌ WebSocket was immediately closed by browser - likely security restriction')
+          }
+        }
+      }, 100) // Check after 100ms
 
       // Set a connection timeout to detect immediate failures
       connectionTimeout.current = setTimeout(() => {
         if (websocket.current && websocket.current.readyState === WebSocket.CONNECTING) {
-          console.warn('WebSocket connection timeout, closing...')
+          console.warn('⏰ WebSocket connection timeout after 10s, closing...')
           websocket.current.close()
           isConnecting.current = false
           setConnectionState('error')
@@ -224,9 +261,10 @@ export function useWebSocket(
           const errorDetails = {
             code: event.code,
             reason: event.reason,
-            url: url,
+            url: currentWs.url,
             attempts: reconnectAttempts.current,
-            shouldNotReconnect
+            shouldNotReconnect,
+            maxAttempts: maxReconnectAttempts
           }
           console.error('WebSocket reconnection stopped:', errorDetails)
           setConnectionState('error')
