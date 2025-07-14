@@ -80,8 +80,6 @@ export default function ConversationDetailPage() {
 
   // Memoized callback for new messages to ensure stability across re-renders
   const handleNewMessage = useCallback((message: any) => {
-    console.log('🎯 onNewMessage callback triggered in conversation page:', message)
-    
     const newMsg: Message = {
       id: message.id,
       content: message.content,
@@ -90,17 +88,9 @@ export default function ConversationDetailPage() {
       type: 'text'
     }
     
-    console.log('🎯 Adding message to conversation:', newMsg)
-    console.log('🎯 Current conversation ID:', conversationId)
-    console.log('🎯 Message conversation ID:', message.conversation_id)
-    
     // Always update conversation state, even if conversation is not loaded yet
     setConversation(prev => {
-      console.log('🎯 Previous conversation state:', prev ? 'exists' : 'null')
-      
       if (!prev) {
-        console.log('⚠️ Conversation not loaded yet, but message received - creating minimal structure')
-        
         // Create a minimal conversation structure to hold the message
         return {
           id: conversationId,
@@ -135,18 +125,13 @@ export default function ConversationDetailPage() {
       )
       
       if (messageExists) {
-        console.log('🚫 Message already exists, skipping duplicate:', newMsg.id)
         return prev
       }
       
-      console.log('✅ Adding message to existing conversation - new message count will be:', prev.messages.length + 1)
-      const updatedConversation = {
+      return {
         ...prev,
         messages: [...prev.messages, newMsg]
       }
-      
-      console.log('✅ Updated conversation state with new message')
-      return updatedConversation
     })
   }, [conversationId])
 
@@ -174,17 +159,6 @@ export default function ConversationDetailPage() {
     }
   })
 
-  // Debug: Log WebSocket connection status
-  useEffect(() => {
-    console.log('🔌 WebSocket status:', {
-      isConnected,
-      hasError: !!connectionError,
-      error: connectionError,
-      userId: currentUser.id,
-      hasToken: !!currentUser.token,
-      enabled: !!currentUser.id && !!currentUser.token
-    })
-  }, [isConnected, connectionError, currentUser.id, currentUser.token])
 
   // Mock data loading - DISABLED
   useEffect(() => {
@@ -376,17 +350,7 @@ export default function ConversationDetailPage() {
     loadConversation()
   }, [conversationId]) // Include conversationId as dependency
 
-  // Debug: Log when conversation state changes
   useEffect(() => {
-    console.log('🔄 Conversation state changed:', {
-      exists: !!conversation,
-      messageCount: conversation?.messages?.length || 0,
-      lastMessage: conversation?.messages?.slice(-1)[0]?.content || 'none'
-    })
-  }, [conversation])
-
-  useEffect(() => {
-    console.log('📜 Messages array changed, scrolling to bottom')
     scrollToBottom()
   }, [conversation?.messages])
 

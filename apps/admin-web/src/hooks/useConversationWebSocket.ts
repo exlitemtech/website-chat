@@ -74,13 +74,8 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     enabled = true
   } = options
 
-  // Debug: Track hook instance creation to identify multiple instances
+  // Stable hook instance reference
   const hookInstanceRef = useRef(Math.random().toString(36).substr(2, 9))
-  console.log('🎯 useConversationWebSocket hook instance:', hookInstanceRef.current, {
-    userId: userId?.substring(0, 8) + '...',
-    conversationId: conversationId?.substring(0, 8) + '...',
-    enabled
-  })
 
   const notifications = useNotifications()
 
@@ -115,35 +110,15 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
   // Memoize WebSocket URL to prevent unnecessary reconnections
   const wsUrl = useMemo(() => {
     if (userId && token && isTokenValid) {
-      const url = API_ENDPOINTS.wsAgent(userId, token)
-      console.log('🔗 WebSocket URL created:', url.substring(0, 100) + '...')
-      return url
+      return API_ENDPOINTS.wsAgent(userId, token)
     }
-    console.log('🔗 WebSocket URL not created - missing requirements:', {
-      hasUserId: !!userId,
-      hasToken: !!token,
-      isTokenValid,
-      tokenLength: token?.length || 0
-    })
     return null
   }, [userId, token, isTokenValid])
     
-  // Debug WebSocket URL construction
-  useEffect(() => {
-    if (wsUrl) {
-      console.log('WebSocket URL constructed:', wsUrl)
-      console.log('Token length:', token?.length)
-      console.log('Token starts with:', token?.substring(0, 20) + '...')
-    }
-  }, [wsUrl, token])
-  
   // Track token expiration
   useEffect(() => {
     if (token && isTokenExpired(token)) {
-      console.warn('JWT token is expired, WebSocket connection will fail')
       setConnectionError('Authentication token expired')
-    } else if (token) {
-      console.log('JWT token is valid for WebSocket connection')
     }
   }, [token])
 
