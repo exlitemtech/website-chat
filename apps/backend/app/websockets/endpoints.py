@@ -24,23 +24,28 @@ async def websocket_agent_endpoint(
 ):
     """WebSocket endpoint for agents/admin users"""
     
-    # Authenticate user
+    # Accept connection first, then authenticate (FastAPI WebSocket pattern)
     try:
-        user = await get_current_user_websocket(token, db)
-        if not user or str(user.id) != user_id:
-            print(f"Authentication failed: user={user}, user_id={user_id}")
-            await websocket.close(code=4001, reason="Unauthorized")
-            return
+        await websocket.accept()
+        print(f"WebSocket connection accepted, now authenticating user {user_id}")
     except Exception as e:
-        print(f"Authentication error: {e}")
-        await websocket.close(code=4001, reason="Authentication failed")
+        print(f"Failed to accept WebSocket connection: {e}")
         return
+    
+    # Authenticate user after accepting connection
+    print(f"WebSocket authentication attempt for user {user_id}")
+    user = await get_current_user_websocket(token, db)
+    if not user or str(user.id) != user_id:
+        print(f"Authentication failed: user={user}, user_id={user_id}")
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+    print(f"WebSocket authentication successful for user {user_id}")
     
     connection_id = str(uuid.uuid4())
     
     try:
         print(f"Attempting to connect WebSocket for agent {user_id}")
-        # Connect to WebSocket
+        # Connect to WebSocket (connection manager will handle accept())
         await connection_manager.connect(
             websocket=websocket,
             connection_id=connection_id,
@@ -106,7 +111,15 @@ async def websocket_visitor_endpoint(
 ):
     """WebSocket endpoint for website visitors"""
     
-    # Verify website exists
+    # Accept connection first
+    try:
+        await websocket.accept()
+        print(f"WebSocket connection accepted for visitor")
+    except Exception as e:
+        print(f"Failed to accept WebSocket connection: {e}")
+        return
+    
+    # Verify website exists after accepting connection
     website = db.query(Website).filter(Website.id == website_id).first()
     if not website:
         await websocket.close(code=4004, reason="Website not found")
@@ -119,7 +132,7 @@ async def websocket_visitor_endpoint(
     connection_id = str(uuid.uuid4())
     
     try:
-        # Connect to WebSocket
+        # Register WebSocket connection
         await connection_manager.connect(
             websocket=websocket,
             connection_id=connection_id,

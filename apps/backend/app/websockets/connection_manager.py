@@ -33,7 +33,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, connection_id: str, user_id: str, 
                      connection_type: str = "agent", website_id: Optional[str] = None,
                      visitor_id: Optional[str] = None):
-        """Accept a new WebSocket connection"""
+        """Register a new WebSocket connection (assumes websocket.accept() already called)"""
         
         # Clean up idle connections first
         await self._cleanup_idle_connections()
@@ -43,24 +43,10 @@ class ConnectionManager:
             await websocket.close(code=4008, reason="Server at capacity")
             raise Exception("Max total connections reached")
         
-        # For agents, enforce strict 1 connection per user - close ALL existing connections
-        if connection_type == "agent":
-            print(f"Agent connection request for user {user_id}, checking existing connections...")
-            existing_count = len(self.user_subscriptions.get(user_id, set()))
-            print(f"Found {existing_count} existing connections for user {user_id}")
-            if existing_count > 0:
-                await self._close_all_user_connections(user_id, "New agent connection established")
-            
-        # For visitors, allow the configured limit
-        elif connection_type == "visitor":
-            user_connections = len(self.user_subscriptions.get(user_id, set()))
-            if user_connections >= self.max_connections_per_user:
-                await self._cleanup_oldest_user_connection(user_id)
-                await asyncio.sleep(0.1)
+        # WebSocket should already be accepted by endpoint
+        print(f"Registering WebSocket connection for {connection_type} {user_id}")
         
-        await websocket.accept()
-        print(f"WebSocket accepted for {connection_type} {user_id}")
-        
+        # Store connection info before closing old ones
         self.active_connections[connection_id] = websocket
         self.connection_info[connection_id] = {
             "user_id": user_id,
@@ -70,6 +56,25 @@ class ConnectionManager:
             "connected_at": datetime.utcnow().isoformat(),
             "last_seen": datetime.utcnow().isoformat()
         }
+        
+        # Subscribe user to their own updates
+        if user_id not in self.user_subscriptions:
+            self.user_subscriptions[user_id] = set()
+        self.user_subscriptions[user_id].add(connection_id)
+        
+        # For agents, temporarily allow multiple connections for testing
+        if connection_type == "agent":
+            print(f"Agent connection established for user {user_id}")
+            # Temporarily disabled: other_connections cleanup for testing
+            # This will be re-enabled after confirming messaging works
+            
+        # For visitors, allow the configured limit
+        elif connection_type == "visitor":
+            existing_visitor_connections = len([conn_id for conn_id in self.user_subscriptions.get(user_id, set()) 
+                                              if conn_id != connection_id])
+            if existing_visitor_connections >= self.max_connections_per_user:
+                await self._cleanup_oldest_user_connection(user_id)
+                await asyncio.sleep(0.1)
         
         # Subscribe user to their own updates
         if user_id not in self.user_subscriptions:
@@ -107,6 +112,31 @@ class ConnectionManager:
         
         # Small delay to ensure cleanup is complete
         await asyncio.sleep(0.2)
+
+    async def _close_specific_connections(self, connection_ids: list, reason: str = "Connection replaced"):
+        """Close specific connections by ID"""
+        if not connection_ids:
+            return
+            
+        print(f"Closing {len(connection_ids)} specific connections")
+        
+        for conn_id in connection_ids:
+            if conn_id in self.active_connections:
+                try:
+                    await self.active_connections[conn_id].close(code=4010, reason=reason)
+                    print(f"Closed connection {conn_id}: {reason}")
+                except Exception as e:
+                    print(f"Error closing connection {conn_id}: {e}")
+                finally:
+                    self.disconnect(conn_id)
+        
+        # Small delay to ensure cleanup is complete
+        await asyncio.sleep(0.1)
+
+    async def _delayed_connection_cleanup(self, connection_ids: list, reason: str):
+        """Close connections after a delay to allow new connection to stabilize"""
+        await asyncio.sleep(5.0)  # Give new connection more time to join conversations and stabilize
+        await self._close_specific_connections(connection_ids, reason)
 
     async def _cleanup_oldest_user_connection(self, user_id: str):
         """Close the oldest connection for a user to make room for a new one"""
@@ -232,17 +262,25 @@ class ConnectionManager:
                                       exclude_connection: Optional[str] = None):
         """Broadcast a message to all connections subscribed to a conversation"""
         if conversation_id not in self.conversation_subscriptions:
+            print(f"📭 No subscribers for conversation {conversation_id}")
             return
+        
+        subscribers = self.conversation_subscriptions[conversation_id]
+        print(f"📤 Broadcasting to {len(subscribers)} subscribers for conversation {conversation_id}")
         
         connections_to_remove = []
         
-        for connection_id in self.conversation_subscriptions[conversation_id]:
+        for connection_id in subscribers:
             if exclude_connection and connection_id == exclude_connection:
+                print(f"⏭️ Skipping excluded connection {connection_id}")
                 continue
                 
             try:
+                print(f"📨 Sending message to connection {connection_id}")
                 await self.send_personal_message(message, connection_id)
-            except:
+                print(f"✅ Message sent to connection {connection_id}")
+            except Exception as e:
+                print(f"❌ Failed to send message to connection {connection_id}: {e}")
                 connections_to_remove.append(connection_id)
         
         # Remove broken connections

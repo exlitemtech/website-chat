@@ -279,16 +279,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
               </Button>
               
-              <NotificationSettings>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="text-slate-400 hover:text-slate-600"
-                  title="Notification settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </NotificationSettings>
+              <NotificationSettings />
             </div>
             
             <div className="h-6 w-px bg-slate-200 mx-2"></div>

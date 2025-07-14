@@ -46,18 +46,12 @@ async def get_current_user_websocket(token: str, db: Session) -> User:
     
     if user_id is None:
         print("WebSocket authentication failed: Invalid token")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
-        )
+        return None
     
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         print(f"WebSocket authentication failed: User not found for id={user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
+        return None
     
     print(f"WebSocket authentication successful: user={user.email}")
     return user

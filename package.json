@@ -16,5 +16,8 @@
     "turbo": "^1.10.16",
     "typescript": "^5.2.2"
   },
-  "packageManager": "npm@9.8.1"
+  "packageManager": "npm@9.8.1",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
 }

@@ -310,10 +310,10 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
   const sendMessage = useCallback((content: string, metadata?: any) => {
     if (!conversationId) {
       console.warn('Cannot send message: no conversation ID')
-      return
+      return false
     }
     
-    send({
+    return send({
       type: 'send_message',
       conversation_id: conversationId,
       content,

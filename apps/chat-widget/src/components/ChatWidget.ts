@@ -586,6 +586,12 @@ export class ChatWidget {
         const conversationId = this.apiClient.getConversationId()
         if (conversationId) {
           this.conversationId = conversationId
+          
+          // Join the conversation via WebSocket if connected
+          if (this.websocket?.isConnected()) {
+            console.log('🔌 Joining conversation after loading history:', conversationId)
+            this.websocket.joinConversation(conversationId)
+          }
         }
       }
     } catch (error) {

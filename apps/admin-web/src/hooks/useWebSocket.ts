@@ -103,7 +103,15 @@ export function useWebSocket(
       
       // Close any existing connection first
       if (websocket.current) {
-        websocket.current.close()
+        // Remove event handlers to prevent callbacks on old connection
+        websocket.current.onopen = null
+        websocket.current.onclose = null
+        websocket.current.onmessage = null
+        websocket.current.onerror = null
+        
+        if (websocket.current.readyState === WebSocket.OPEN || websocket.current.readyState === WebSocket.CONNECTING) {
+          websocket.current.close()
+        }
         websocket.current = null
       }
       
@@ -378,9 +386,13 @@ export function useWebSocket(
         clearInterval(heartbeatTimer.current)
         heartbeatTimer.current = undefined
       }
-      disconnect()
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current)
+        reconnectTimer.current = undefined
+      }
+      // Don't disconnect on cleanup - let it be handled by enabled change
     }
-  }, [enabled, url, connect, disconnect])
+  }, [enabled, url]) // Remove connect and disconnect from dependencies
 
   // Handle page visibility changes to close connections when switching tabs
   useEffect(() => {

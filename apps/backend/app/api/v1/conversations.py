@@ -9,6 +9,7 @@ from app.models.website import Website
 from app.models.visitor import Visitor
 from app.models.user import User
 from app.api.auth import get_current_user
+from app.websockets.connection_manager import connection_manager
 from pydantic import BaseModel
 import uuid
 
@@ -254,6 +255,29 @@ async def send_message(
     
     db.commit()
     db.refresh(message)
+    
+    # Broadcast the message to connected clients via WebSocket
+    try:
+        message_data = {
+            "id": message.id,
+            "content": message.content,
+            "sender": message.sender,
+            "sender_id": message.sender_id,
+            "timestamp": message.created_at.isoformat(),
+            "conversation_id": conversation_id,
+            "type": "text"
+        }
+        
+        print(f"📡 Agent API: Broadcasting message to conversation {conversation_id}")
+        await connection_manager.broadcast_to_conversation({
+            "type": "new_message",
+            "message": message_data
+        }, conversation_id)
+        print(f"📡 Agent API: Message broadcast completed")
+        
+    except Exception as broadcast_error:
+        print(f"❌ Agent API: Failed to broadcast message: {broadcast_error}")
+        # Don't fail the API request if broadcasting fails
     
     return MessageResponse(
         id=message.id,
