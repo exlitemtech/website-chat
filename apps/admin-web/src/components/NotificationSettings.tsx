@@ -71,7 +71,7 @@ export default function NotificationSettings({ children }: NotificationSettingsP
           {children}
         </DialogTrigger>
       ) : (
-        <DialogTrigger>
+        <DialogTrigger asChild>
           <Button 
             variant="ghost" 
             size="icon" 
