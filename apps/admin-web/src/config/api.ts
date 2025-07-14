@@ -20,8 +20,8 @@ export const WS_BASE_URL = (() => {
     }
   }
   
-  // Default to localhost for development
-  return isDevelopment ? 'ws://localhost:8000' : 'wss://localhost:8000'
+  // Default to IP address for development (helps with browser security restrictions)
+  return isDevelopment ? 'ws://127.0.0.1:8000' : 'wss://localhost:8000'
 })()
 
 // API endpoints
