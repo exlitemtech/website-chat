@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useWebSocket } from './useWebSocket'
 import { useNotifications } from './useNotifications'
 import { API_ENDPOINTS } from '@/config/api'
@@ -74,7 +74,37 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
     enabled = true
   } = options
 
+  // Debug: Track hook instance creation to identify multiple instances
+  const hookInstanceRef = useRef(Math.random().toString(36).substr(2, 9))
+  console.log('🎯 useConversationWebSocket hook instance:', hookInstanceRef.current, {
+    userId: userId?.substring(0, 8) + '...',
+    conversationId: conversationId?.substring(0, 8) + '...',
+    enabled
+  })
+
   const notifications = useNotifications()
+
+  // Use refs to store callbacks to prevent unnecessary re-renders
+  const callbacksRef = useRef({
+    onNewMessage,
+    onTypingStart,
+    onTypingStop,
+    onAgentJoined,
+    onAgentLeft,
+    onVisitorJoined
+  })
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    callbacksRef.current = {
+      onNewMessage,
+      onTypingStart,
+      onTypingStop,
+      onAgentJoined,
+      onAgentLeft,
+      onVisitorJoined
+    }
+  }, [onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined])
 
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -130,7 +160,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
         console.log('🔔 Received new_message via WebSocket:', message.message)
         if (message.message) {
           console.log('🔔 Calling onNewMessage callback with:', message.message)
-          onNewMessage?.(message.message)
+          callbacksRef.current.onNewMessage?.(message.message)
           
           // Show notification for new messages from visitors
           if (enableNotifications && 
@@ -176,7 +206,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
         const startTypingId = message.user_id || message.visitor_id
         if (startTypingId && startTypingId !== userId) {
           setTypingUsers(prev => new Set(prev).add(startTypingId))
-          onTypingStart?.(message)
+          callbacksRef.current.onTypingStart?.(message)
         }
         break
         
@@ -188,20 +218,20 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
             newSet.delete(stopTypingId)
             return newSet
           })
-          onTypingStop?.(message)
+          callbacksRef.current.onTypingStop?.(message)
         }
         break
         
       case 'agent_joined':
-        onAgentJoined?.(message)
+        callbacksRef.current.onAgentJoined?.(message)
         break
         
       case 'agent_left':
-        onAgentLeft?.(message)
+        callbacksRef.current.onAgentLeft?.(message)
         break
         
       case 'visitor_joined':
-        onVisitorJoined?.(message)
+        callbacksRef.current.onVisitorJoined?.(message)
         
         // Show notification for new conversations
         if (enableNotifications && message.conversation_id && message.is_new_conversation) {
@@ -229,7 +259,7 @@ export function useConversationWebSocket(options: UseConversationWebSocketOption
       default:
         console.log('Unknown message type:', message.type, message)
     }
-  }, [userId, onNewMessage, onTypingStart, onTypingStop, onAgentJoined, onAgentLeft, onVisitorJoined, enableNotifications, currentConversationId, notifications])
+  }, [userId, enableNotifications, currentConversationId, notifications])
 
   const handleConnect = useCallback(() => {
     console.log('WebSocket connected')
