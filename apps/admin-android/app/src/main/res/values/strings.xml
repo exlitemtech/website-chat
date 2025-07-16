@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Website Chat Admin</string>
+    <string name="login">Login</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="conversations">Conversations</string>
+    <string name="send_message">Send message</string>
+    <string name="type_message">Type a message...</string>
+    <string name="logout">Logout</string>
+    <string name="no_conversations">No conversations yet</string>
+    <string name="loading">Loading...</string>
+    <string name="error_occurred">An error occurred</string>
+    <string name="retry">Retry</string>
+</resources>
