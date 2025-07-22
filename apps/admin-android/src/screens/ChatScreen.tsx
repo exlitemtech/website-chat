@@ -34,6 +34,20 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Debug messages state changes
+  useEffect(() => {
+    console.log('💬 Messages state updated. Total messages:', messages.length)
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      console.log('💬 Last message:', {
+        sender: lastMessage.senderType,
+        senderId: lastMessage.senderId,
+        content: lastMessage.content.substring(0, 30),
+        timestamp: lastMessage.timestamp.toISOString()
+      })
+    }
+  }, [messages])
   const [isSending, setIsSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [visitorTyping, setVisitorTyping] = useState(false)
@@ -63,7 +77,12 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
 
   const { isConnected, send: sendWebSocketMessage } = useWebSocket(wsUrl, {
     onMessage: (message) => {
-      console.log('WebSocket message received:', message.type, message)
+      console.log('📨 WebSocket message received:', {
+        type: message.type,
+        hasMessage: !!message.message,
+        messageKeys: message.message ? Object.keys(message.message) : [],
+        fullMessage: message
+      })
       
       switch (message.type) {
         case 'connection_established':
@@ -77,17 +96,26 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
             
             // Only add if it's for this conversation
             if (messageData.conversation_id === conversation.id) {
-              // Don't add messages from the current user to avoid duplicates
-              const isFromCurrentUser = messageData.sender === 'agent' && messageData.sender_id === currentUserId
+              // Check if we already have this message (by ID or by content+timestamp)
+              const messageExists = messages.some(msg => 
+                msg.id === messageData.id || 
+                (msg.content === messageData.content && 
+                 Math.abs(msg.timestamp.getTime() - new Date(messageData.timestamp).getTime()) < 1000)
+              )
               
-              console.log('Message check:', {
+              console.log('🔍 Message check:', {
                 sender: messageData.sender,
                 senderId: messageData.sender_id,
                 currentUserId: currentUserId,
-                isFromCurrentUser
+                messageId: messageData.id,
+                messageExists: messageExists,
+                conversationId: messageData.conversation_id,
+                currentConversationId: conversation.id,
+                willAddToDOM: !messageExists,
+                messageContent: messageData.content?.substring(0, 30)
               })
               
-              if (!isFromCurrentUser) {
+              if (!messageExists) {
                 const newMsg: Message = {
                   id: messageData.id,
                   conversationId: messageData.conversation_id,
@@ -98,16 +126,31 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
                   timestamp: new Date(messageData.timestamp),
                   readAt: messageData.readAt ? new Date(messageData.readAt) : undefined,
                 }
-                console.log('Adding new message from WebSocket:', newMsg)
-                setMessages(prev => [...prev, newMsg])
+                console.log('✅ Adding new message from WebSocket to DOM:', newMsg)
+                setMessages(prev => {
+                  console.log('📝 Current messages count:', prev.length, 'Adding new message, new count will be:', prev.length + 1)
+                  const updatedMessages = [...prev, newMsg]
+                  console.log('📝 Updated messages array:', updatedMessages.map(m => ({
+                    id: m.id,
+                    sender: m.senderType,
+                    content: m.content.substring(0, 20)
+                  })))
+                  return updatedMessages
+                })
                 
                 // Scroll to bottom when new message arrives
                 setTimeout(() => {
+                  console.log('📜 Scrolling to bottom after new message')
                   flatListRef.current?.scrollToEnd({ animated: true })
                 }, 100)
               } else {
-                console.log('Ignoring message from current user to avoid duplicate')
+                console.log('⏭️ Skipping duplicate message:', messageData.id, messageData.content?.substring(0, 30))
               }
+            } else {
+              console.log('❌ Message not for current conversation:', {
+                messageConversationId: messageData.conversation_id,
+                currentConversationId: conversation.id
+              })
             }
           }
           break
@@ -131,12 +174,15 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
       }
     },
     onConnect: () => {
-      console.log('WebSocket connected, joining conversation:', conversation.id)
+      console.log('🔗 WebSocket connected, joining conversation:', conversation.id)
       // Join the conversation - use the exact same format as web admin
-      sendWebSocketMessage({
+      const joinMessage = {
         type: 'join_conversation',
         conversation_id: conversation.id
-      })
+      }
+      console.log('📤 Sending join_conversation message:', joinMessage)
+      const sent = sendWebSocketMessage(joinMessage)
+      console.log('📤 Join message sent successfully:', sent)
     },
     onDisconnect: () => {
       console.log('WebSocket disconnected')
@@ -203,7 +249,21 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
           isOwnMessage: m.senderId === user?.id
         })))
         
-        setMessages(messagesWithDates)
+        // Merge messages instead of replacing them to preserve WebSocket messages
+        setMessages(prev => {
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMessages = messagesWithDates.filter(m => !existingIds.has(m.id))
+          const merged = [...prev, ...newMessages].sort((a, b) => 
+            a.timestamp.getTime() - b.timestamp.getTime()
+          )
+          console.log('📊 Merged messages:', {
+            previous: prev.length,
+            fetched: messagesWithDates.length,
+            new: newMessages.length,
+            total: merged.length
+          })
+          return merged
+        })
         
         // Scroll to bottom after loading messages
         setTimeout(() => {
@@ -225,6 +285,19 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
   useEffect(() => {
     fetchMessages()
   }, [conversation.id])
+  
+  // Fallback polling only when WebSocket is disconnected
+  useEffect(() => {
+    if (!isConnected) {
+      console.log('⚠️ WebSocket disconnected, enabling fallback polling')
+      const pollInterval = setInterval(() => {
+        console.log('🔄 Polling for new messages (WebSocket disconnected)')
+        fetchMessages()
+      }, 3000)
+      
+      return () => clearInterval(pollInterval)
+    }
+  }, [isConnected])
 
   const handleTyping = (text: string) => {
     setNewMessage(text)
@@ -283,7 +356,7 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
     }
 
     try {
-      console.log('Sending message:', messageContent)
+      console.log('📤 Sending message:', messageContent)
       
       // ALWAYS use REST API for persistence to ensure message is saved
       const token = await AuthUtils.getToken()
@@ -315,7 +388,16 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
           readAt: newMsg.readAt ? new Date(newMsg.readAt) : undefined,
         }
         
-        setMessages(prev => [...prev, messageWithDate])
+        // Add to messages only if it doesn't already exist (in case WebSocket already delivered it)
+        setMessages(prev => {
+          const exists = prev.some(msg => msg.id === messageWithDate.id)
+          if (exists) {
+            console.log('📋 Message already exists (via WebSocket), not adding duplicate')
+            return prev
+          }
+          console.log('➕ Adding sent message to local state')
+          return [...prev, messageWithDate]
+        })
 
         // IMPORTANT: Don't send via WebSocket for our own messages
         // The backend will handle broadcasting to other clients when we send via REST API
@@ -346,13 +428,16 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
     // Check if message is from current user (agent)
     const isOwnMessage = item.senderType === 'agent' && item.senderId === currentUserId
     
-    console.log('Rendering message:', {
-      itemSenderId: item.senderId,
-      currentUserId: currentUserId,
-      senderType: item.senderType,
-      isOwnMessage: isOwnMessage,
-      content: item.content.substring(0, 20)
-    })
+    // Only log occasionally to avoid spam
+    if (Math.random() < 0.1) {
+      console.log('🎨 Rendering message:', {
+        itemSenderId: item.senderId,
+        currentUserId: currentUserId,
+        senderType: item.senderType,
+        isOwnMessage: isOwnMessage,
+        content: item.content.substring(0, 20)
+      })
+    }
 
     return (
       <View style={[
@@ -434,6 +519,7 @@ export default function ChatScreen({ conversation, onBack }: ChatScreenProps) {
           keyExtractor={(item) => item.id}
           style={styles.messagesList}
           contentContainerStyle={styles.messagesContent}
+          extraData={messages.length} // Force re-render when messages change
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           ListFooterComponent={
             visitorTyping ? (

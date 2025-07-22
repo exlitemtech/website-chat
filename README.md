@@ -81,7 +81,11 @@ uvicorn app.main:app --reload
 cd apps/admin-web
 npm run dev
 
-# Terminal 3: Build packages
+# Terminal 3: Admin Android (React Native)
+cd apps/admin-android
+npx expo start
+
+# Terminal 4: Build packages
 npm run dev
 ```
 

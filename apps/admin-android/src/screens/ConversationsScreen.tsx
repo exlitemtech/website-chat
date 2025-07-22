@@ -15,9 +15,10 @@ import { AuthUtils } from '../utils/auth'
 
 interface ConversationsScreenProps {
   onConversationSelect: (conversation: Conversation) => void
+  onLogout: () => void
 }
 
-export default function ConversationsScreen({ onConversationSelect }: ConversationsScreenProps) {
+export default function ConversationsScreen({ onConversationSelect, onLogout }: ConversationsScreenProps) {
   console.log('ConversationsScreen mounted')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -171,6 +172,9 @@ export default function ConversationsScreen({ onConversationSelect }: Conversati
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Conversations ({conversations.length})</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
       
       <FlatList
@@ -213,11 +217,26 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+  },
+  logoutButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#FF3B30',
+    borderRadius: 6,
+  },
+  logoutText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   conversationItem: {
     backgroundColor: 'white',

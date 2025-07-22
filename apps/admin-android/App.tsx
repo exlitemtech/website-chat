@@ -67,7 +67,10 @@ export default function App() {
       )}
       
       {appState === 'conversations' && (
-        <ConversationsScreen onConversationSelect={handleConversationSelect} />
+        <ConversationsScreen 
+          onConversationSelect={handleConversationSelect}
+          onLogout={handleLogout}
+        />
       )}
       
       {appState === 'chat' && selectedConversation && (
