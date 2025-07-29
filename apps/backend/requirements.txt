@@ -41,9 +41,7 @@ starlette==0.47.1
 typing-inspection==0.4.1
 typing_extensions==4.14.1
 uvicorn==0.35.0
-uvloop==0.21.0
+uvloop==0.21.0; sys_platform != "win32"
 watchfiles==1.1.0
-# Editable install with no version control (website-chat-backend==0.1.0)
--e /Users/ashish/Projects/website-chat/apps/backend
 websockets==15.0.1
 wsproto==1.2.0

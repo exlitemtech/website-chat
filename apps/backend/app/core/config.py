@@ -3,13 +3,13 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "postgresql://user:password@localhost/website_chat"
+    database_url: str
     
     # Redis
-    redis_url: str = "redis://localhost:6379"
+    redis_url: str
     
     # JWT
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
