@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useNotifications } from '@/hooks/useNotifications'
 import { useConversationWebSocket } from '@/hooks/useConversationWebSocket'
 import NotificationSettings from '@/components/NotificationSettings'
+import { useAuth } from '@/contexts/AuthContext'
 import { 
   Layout, 
   LayoutHeader, 
@@ -35,24 +36,13 @@ import {
   VolumeX
 } from 'lucide-react'
 
-interface User {
-  id: string
-  name: string
-  email: string
-  role: string
-  websiteIds: string[]
-  avatar?: string
-}
-
 interface AppLayoutProps {
   children: React.ReactNode
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, isAuthenticated, isInitializing, logout, tokens } = useAuth()
   const [mounted, setMounted] = useState(false)
-  const [showNotificationSettings, setShowNotificationSettings] = useState(false)
   const [isConversationView, setIsConversationView] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -70,44 +60,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [mounted, pathname])
 
-  useEffect(() => {
-    if (!mounted) return
-    
-    const token = localStorage.getItem('accessToken')
-    const userData = localStorage.getItem('user')
-
-    if (!token || !userData) {
+   // Redirect to login if not authenticated
+   useEffect(() => {
+    if (mounted && !isInitializing && !isAuthenticated) {
       router.push('/login')
-      return
     }
-
-    try {
-      setUser(JSON.parse(userData))
-    } catch (error) {
-      console.error('Failed to parse user data:', error)
-      router.push('/login')
-      return
-    }
-    
-    setIsLoading(false)
-  }, [mounted, router])
+  }, [mounted, isInitializing, isAuthenticated, router])
 
   // Initialize WebSocket connection for global notifications (client-side only)
   const { isConnected } = useConversationWebSocket({
     userId: mounted && user?.id ? user.id : '',
-    token: mounted && typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '',
+    token: mounted && tokens?.accessToken ? tokens.accessToken : '',
     enableNotifications: true,
     currentConversationId: isConversationView ? pathname.split('/').pop() : undefined,
     enabled: mounted && !!user?.id && !isConversationView // Disable when viewing specific conversation to prevent duplicate connections
   })
 
-  const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
-    }
-    router.push('/login')
+  const handleLogout = async () => {
+    await logout()
   }
 
   const handleNotificationToggle = async () => {
@@ -126,14 +96,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     })
   }
 
-  const handleDoNotDisturbToggle = () => {
-    if (notifications.preferences.doNotDisturb) {
-      notifications.disableDoNotDisturb()
-    } else {
-      notifications.enableDoNotDisturb()
-    }
-  }
-
   const navigation = [
     { name: 'Dashboard', href: '/', icon: BarChart3 },
     { name: 'Conversations', href: '/conversations', icon: MessageCircle, badge: '3' },
@@ -142,12 +104,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
-  if (!mounted || isLoading) {
+  if (!mounted || isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

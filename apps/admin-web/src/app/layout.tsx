@@ -1,5 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { RouteGuard } from '@/components/RouteGuard'
 
 export const metadata: Metadata = {
   title: 'Website Chat Admin',
@@ -14,7 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
-        {children}
+        <AuthProvider>
+          <RouteGuard>
+            {children}
+          </RouteGuard>
+        </AuthProvider>
       </body>
     </html>
   )

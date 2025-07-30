@@ -3,45 +3,37 @@
 import { useState } from 'react'
 import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Input } from '@website-chat/ui'
 import { MessageCircle, AlertCircle } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
+  const { login, isLoading } = useAuth()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError('')
 
+    if (!email || !password) {
+      setError('Please enter both email and password')
+      return
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/api/v1/demo/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Login failed')
+      // ✅ Use the login function from AuthContext
+      const { success, error } = await login(email, password)
+      console.log(success, 'success')
+      if (success) {
+        // Redirect to dashboard after successful login
+        router.push('/dashboard')
+      } else {
+        setError(error || 'Invalid email or password')
       }
-
-      const data = await response.json()
-      
-      // Store tokens in localStorage (in production, use httpOnly cookies)
-      localStorage.setItem('accessToken', data.accessToken)
-      localStorage.setItem('refreshToken', data.refreshToken)
-      localStorage.setItem('user', JSON.stringify(data.user))
-
-      // Redirect to dashboard
-      window.location.href = '/'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
-      setIsLoading(false)
     }
   }
 

@@ -12,6 +12,7 @@ import {
   LogOut,
   Bell
 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface NavItem {
   title: string
@@ -53,6 +54,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,7 +111,7 @@ export default function DashboardLayout({
                   <span aria-hidden="true">Admin User</span>
                 </div>
                 
-                <Button variant="ghost" className="w-full justify-start text-gray-700 hover:text-red-600">
+                <Button variant="ghost" className="w-full justify-start text-gray-700 hover:text-red-600" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
                 </Button>
