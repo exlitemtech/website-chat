@@ -9,12 +9,13 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL, API_ENDPOINTS } from "@/config/api";
+import SessionExpirationDialog from "@/components/SessionExpirationDialog";
 
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "manager" | "agent";
+  role: string;
   websiteIds: string[];
   avatar?: string;
   status?: string;
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // For initial auth check
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
   const router = useRouter();
 
   // Initialize auth state from localStorage
@@ -99,6 +101,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
   };
+
+  // Check token periodically if it is expired
+  useEffect(() => {
+    const checkTokenExpiration = () => {
+      if (tokens?.accessToken && !isTokenValid(tokens.accessToken)) {
+        setIsSessionExpired(true);
+      }
+    };
+
+    checkTokenExpiration();
+
+    const interval = setInterval(checkTokenExpiration, 1000 * 10); // Check every 10 seconds
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [tokens?.accessToken]);
 
   // Clear auth data
   const clearAuth = () => {
@@ -188,7 +207,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error("Token refresh failed");
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Token refresh failed:", errorData.detail || "Unknown error");
+        
+        // If refresh token is invalid, clear auth immediately
+        if (response.status === 401) {
+          clearAuth();
+        }
+        return false;
       }
 
       const data = await response.json();
@@ -200,11 +226,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setTokens(newTokens);
       localStorage.setItem("auth_tokens", JSON.stringify(newTokens));
-
       return true;
     } catch (error) {
       console.error("Token refresh error:", error);
-      clearAuth();
       return false;
     }
   };
@@ -268,6 +292,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+   // Add a function to handle session expiration login
+  const handleSessionExpirationLogin = () => {
+    clearAuth(); // Clear auth data when user clicks login
+    setIsSessionExpired(false);
+    router.push('/login');
+  };
+
   const value: AuthContextType = {
     user,
     tokens,
@@ -278,10 +309,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshAuth,
     updateProfile,
-    updateUser,
+    updateUser
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>
+  {children}
+  {isSessionExpired && <SessionExpirationDialog isOpen={isSessionExpired} onLogin={handleSessionExpirationLogin} />}
+  </AuthContext.Provider>;
 }
 
 export function useAuth() {

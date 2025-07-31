@@ -35,15 +35,6 @@ export default function NotFound() {
                 <Home className="mr-2 h-4 w-4" />
                 Go to Home
               </Button>
-
-              <Button 
-                variant="outline"
-                onClick={() => router.back()}
-                className="w-full border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Go Back
-              </Button>
             </div>
             
             <div className="text-center pt-4 border-t border-gray-100">
