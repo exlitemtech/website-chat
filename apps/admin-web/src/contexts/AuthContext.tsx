@@ -104,9 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check token periodically if it is expired
   useEffect(() => {
-    const checkTokenExpiration = () => {
+    const checkTokenExpiration = async () => {
       if (tokens?.accessToken && !isTokenValid(tokens.accessToken)) {
-        setIsSessionExpired(true);
+         // Try to refresh first
+        const refreshSuccess = await refreshAuth();
+        if (!refreshSuccess) {
+          // Only show dialog if refresh fails
+          setIsSessionExpired(true);
+        }
       }
     };
 
