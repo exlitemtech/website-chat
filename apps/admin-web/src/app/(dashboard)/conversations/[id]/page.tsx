@@ -7,6 +7,7 @@ import { ArrowLeft, Send, User, Globe, Clock, CheckCircle, AlertCircle, Phone, M
 import Link from 'next/link'
 import { useConversationWebSocket } from '@/hooks/useConversationWebSocket'
 import { API_BASE_URL } from '@/config/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Message {
   id: string
@@ -54,29 +55,35 @@ export default function ConversationDetailPage() {
   const [serverError, setServerError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
+  const { tokens, user, isAuthenticated, isInitializing } = useAuth()
 
   // Get real user data from localStorage (client-side only)
   const [currentUser, setCurrentUser] = useState({ id: '', token: '' })
   
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('accessToken') || ''
-      const userData = localStorage.getItem('user')
-      const user = userData ? JSON.parse(userData) : { id: '' }
-      
-      console.log('🔐 Setting up user authentication for WebSocket:', {
-        hasToken: !!token,
-        tokenLength: token.length,
-        userId: user.id || 'none',
-        userName: user.name || 'none'
-      })
-      
-      setCurrentUser({
-        id: user.id || '',
-        token: token
-      })
+    if (typeof window !== 'undefined' && !isInitializing) {
+      // Use AuthContext instead of direct localStorage access
+      if (isAuthenticated && tokens?.accessToken && user) {
+        console.log('🔐 Setting up user authentication for WebSocket:', {
+          hasToken: !!tokens.accessToken,
+          tokenLength: tokens.accessToken.length,
+          userId: user.id || 'none',
+          userName: user.name || 'none'
+        })
+        
+        setCurrentUser({
+          id: user.id || '',
+          token: tokens.accessToken
+        })
+      } else {
+        console.log('User not authenticated or missing token')
+        setCurrentUser({
+          id: '',
+          token: ''
+        })
+      }
     }
-  }, [])
+  }, [isAuthenticated, tokens?.accessToken, user, isInitializing])
 
   // Memoized callback for new messages to ensure stability across re-renders
   const handleNewMessage = useCallback((message: any) => {
@@ -234,16 +241,16 @@ export default function ConversationDetailPage() {
     
     const loadConversation = async () => {
       try {
-        const token = localStorage.getItem('accessToken')
-        if (!token) {
-          console.log('No token found')
+        // Use AuthContext instead of direct localStorage access
+        if (!isAuthenticated || !tokens?.accessToken) {
+          console.log('No token found, user not authenticated')
           setLoading(false)
           return
         }
 
         const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${tokens?.accessToken}`,
             'Content-Type': 'application/json'
           }
         })

@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Badge, Tabs, TabsContent, TabsList, TabsTrigger, Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@website-chat/ui'
 import { Search, MessageSquare, Clock, CheckCircle, AlertCircle, Filter, User, Globe, MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { API_BASE_URL, API_ENDPOINTS } from '@/config/api'
 
 interface Conversation {
   id: string
@@ -26,6 +28,7 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const { tokens, isAuthenticated, isInitializing } = useAuth() 
 
   // Load conversations with caching
   useEffect(() => {
@@ -34,11 +37,13 @@ export default function ConversationsPage() {
     const loadConversations = async () => {
       try {
         if (typeof window === 'undefined') return
+
+        // Wait for auth initialization to complete
+        if (isInitializing) return
         
-        const token = localStorage.getItem('accessToken')
-        
-        if (!token) {
-          console.log('No token found, using demo mode')
+        // Check if user is authenticated
+        if (!isAuthenticated || !tokens?.accessToken) {
+          console.log('No token found, user not authenticated')
           if (isMounted) {
             setConversations([])
             setLoading(false)
@@ -46,9 +51,9 @@ export default function ConversationsPage() {
           return
         }
 
-        const response = await fetch('http://localhost:8000/api/v1/conversations/', {
+        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.conversations}`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${tokens?.accessToken}`,
             'Content-Type': 'application/json'
           },
           cache: 'no-cache' // Prevent aggressive caching for real-time data
@@ -77,7 +82,7 @@ export default function ConversationsPage() {
                     }
                     return 'Unknown time'
                   } catch (timeError) {
-                    console.warn('Error formatting timestamp:', timeValue, timeError)
+                    console.warn('Error formatting timestamp:', conv?.last_message_time || conv?.created_at, timeError)
                     return 'Invalid time'
                   }
                 })(),
@@ -139,7 +144,7 @@ export default function ConversationsPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [isInitializing, isAuthenticated, tokens?.accessToken])
 
   const getStatusBadge = (status: string) => {
     switch (status) {

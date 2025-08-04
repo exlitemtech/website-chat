@@ -25,7 +25,6 @@ export default function LoginPage() {
     try {
       // ✅ Use the login function from AuthContext
       const { success, error } = await login(email, password)
-      console.log(success, 'success')
       if (success) {
         // Redirect to dashboard after successful login
         router.push('/dashboard')
