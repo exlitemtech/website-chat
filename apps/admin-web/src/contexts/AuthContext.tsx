@@ -10,15 +10,17 @@ import React, {
 import { useRouter } from "next/navigation";
 import { API_BASE_URL, API_ENDPOINTS } from "@/config/api";
 import SessionExpirationDialog from "@/components/SessionExpirationDialog";
+// Import shared types
+import { UserRole, UserStatus, LoginRequest, LoginResponse, RefreshTokenRequest, RefreshTokenResponse } from '@website-chat/shared';
 
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: UserRole;
   websiteIds: string[];
   avatar?: string;
-  status?: string;
+  status?: UserStatus;
   createdAt?: string;
   lastLogin?: string;
 }
@@ -43,8 +45,8 @@ interface AuthContextType {
     name?: string;
     avatar?: string;
     password?: string;
-    role?: string;
-    status?: string;
+    role?: UserRole;
+    status?: UserStatus;
     websiteIds?: string[];
   }) => Promise<boolean>;
 }
@@ -137,12 +139,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
+      // Use shared LoginRequest type for validation
+      const loginRequestPayload: LoginRequest = { email, password };
       const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.login}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(loginRequestPayload),
       });
 
       if (!response.ok) {
@@ -150,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: errorData.detail || "Login failed" };
       }
 
-      const data = await response.json();
+      const data: LoginResponse = await response.json();
 
       // Store tokens and user data
       const authTokens: AuthTokens = {
@@ -203,12 +207,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      // Use shared RefreshTokenRequest type
+      const refreshDataPayload: RefreshTokenRequest = { refreshToken: tokens.refreshToken };
+
       const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.refresh}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+        body: JSON.stringify(refreshDataPayload),
       });
 
       if (!response.ok) {
@@ -222,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const data = await response.json();
+      const data: RefreshTokenResponse = await response.json();
 
       const newTokens: AuthTokens = {
         accessToken: data.accessToken,
@@ -253,8 +260,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name?: string;
     avatar?: string;
     password?: string;
-    role?: string;
-    status?: string;
+    role?: UserRole;
+    status?: UserStatus;
     websiteIds?: string[];
   }) => {
     try {
